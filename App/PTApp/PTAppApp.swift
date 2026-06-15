@@ -1,4 +1,6 @@
 import SwiftUI
+import SwiftData
+import DataKit
 import UI
 
 @main
@@ -7,5 +9,6 @@ struct PTAppApp: App {
         WindowGroup {
             RootView()
         }
+        .modelContainer(try! ModelContainerFactory.production())
     }
 }
