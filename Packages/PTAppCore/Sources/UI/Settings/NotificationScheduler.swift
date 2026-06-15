@@ -1,7 +1,7 @@
 import Foundation
 import UserNotifications
 
-public final class NotificationScheduler {
+public final class NotificationScheduler: Sendable {
     public static let identifier = "ptapp.dailyReminder"
 
     public init() {}
