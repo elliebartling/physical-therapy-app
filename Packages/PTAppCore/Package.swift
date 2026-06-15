@@ -14,7 +14,11 @@ let package = Package(
     targets: [
         .target(name: "DataKit"),
         .target(name: "ParsingKit", dependencies: ["DataKit"]),
-        .target(name: "SessionKit", dependencies: ["DataKit"]),
+        .target(
+            name: "SessionKit",
+            dependencies: ["DataKit"],
+            resources: [.process("Resources")]
+        ),
         .target(name: "HistoryKit", dependencies: ["DataKit"]),
         .target(name: "UI", dependencies: ["DataKit", "ParsingKit", "SessionKit", "HistoryKit"]),
         .testTarget(name: "DataKitTests", dependencies: ["DataKit"]),
