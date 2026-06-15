@@ -2,7 +2,7 @@ import Foundation
 import Vision
 import UIKit
 
-public final class OCRService {
+public final class OCRService: Sendable {
     public init() {}
 
     public func recognizeLines(in image: UIImage) async throws -> [String] {
