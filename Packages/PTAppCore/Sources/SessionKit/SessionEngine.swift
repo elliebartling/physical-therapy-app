@@ -14,6 +14,9 @@ public final class SessionEngine {
     private var currentSetIndex = 0
     private var setCompletion: CheckedContinuation<Void, Never>?
 
+    private var isPaused = false
+    private var pauseContinuation: CheckedContinuation<Void, Never>?
+
     public init(routine: Routine, clock: Clock = SystemClock()) {
         self.routine = routine
         self.clock = clock
@@ -41,9 +44,36 @@ public final class SessionEngine {
         setCompletion = nil
     }
 
+    public func pause() {
+        guard !isPaused else { return }
+        isPaused = true
+        continuation.yield(.paused)
+    }
+
+    public func resume() {
+        guard isPaused else { return }
+        isPaused = false
+        pauseContinuation?.resume(); pauseContinuation = nil
+        continuation.yield(.resumed)
+    }
+
+    public func skipCurrentSet() async throws {
+        setCompletion?.resume()
+        setCompletion = nil
+    }
+
+    private func awaitIfPaused() async {
+        guard isPaused else { return }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            pauseContinuation = cont
+        }
+    }
+
     private func runExercise(_ exercise: Exercise) async throws {
         let totalSets = exercise.target.totalSets
         for setIndex in 0..<totalSets {
+            await Task.yield()
+            await awaitIfPaused()
             currentSetIndex = setIndex
             continuation.yield(.setStarted(setIndex: setIndex, totalSets: totalSets, side: exercise.side))
 
@@ -55,6 +85,9 @@ public final class SessionEngine {
             case .timeSets(let seconds, _):
                 try await clock.sleep(seconds: Double(seconds))
             }
+
+            await Task.yield()
+            await awaitIfPaused()
 
             let isLastSet = setIndex == totalSets - 1
             if !isLastSet, exercise.restSeconds > 0 {
