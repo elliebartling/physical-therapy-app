@@ -2,7 +2,8 @@ import Foundation
 import DataKit
 
 public struct ParsedRoutine: Codable, Sendable, Equatable {
-    public struct ParsedExercise: Codable, Sendable, Equatable {
+    public struct ParsedExercise: Codable, Sendable, Equatable, Identifiable {
+        public var id: UUID
         public var name: String
         public var reps: Int?
         public var sets: Int
@@ -11,7 +12,8 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
         public var side: String
         public var notes: String
 
-        public init(name: String, reps: Int?, sets: Int, durationSec: Int?, restSec: Int, side: String, notes: String) {
+        public init(id: UUID = UUID(), name: String, reps: Int?, sets: Int, durationSec: Int?, restSec: Int, side: String, notes: String) {
+            self.id = id
             self.name = name
             self.reps = reps
             self.sets = sets
@@ -19,6 +21,22 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
             self.restSec = restSec
             self.side = side
             self.notes = notes
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id, name, reps, sets, durationSec, restSec, side, notes
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+            self.name = try c.decode(String.self, forKey: .name)
+            self.reps = try c.decodeIfPresent(Int.self, forKey: .reps)
+            self.sets = try c.decode(Int.self, forKey: .sets)
+            self.durationSec = try c.decodeIfPresent(Int.self, forKey: .durationSec)
+            self.restSec = try c.decode(Int.self, forKey: .restSec)
+            self.side = try c.decode(String.self, forKey: .side)
+            self.notes = try c.decode(String.self, forKey: .notes)
         }
     }
 

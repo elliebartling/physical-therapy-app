@@ -18,7 +18,7 @@ public struct RoutineEditorView: View {
                         .font(AppFont.mono(18, weight: .medium))
                 }
                 Section("Exercises") {
-                    ForEach($viewModel.exercises, id: \.name) { $ex in
+                    ForEach($viewModel.exercises, id: \.id) { $ex in
                         NavigationLink(destination: ExerciseEditorView(exercise: $ex)) {
                             HStack {
                                 Text(ex.name).font(AppFont.mono(16))
