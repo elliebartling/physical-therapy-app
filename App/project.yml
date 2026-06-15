@@ -33,6 +33,10 @@ targets:
         NSPhotoLibraryUsageDescription: "Used to pick a photo of your PT handout."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        UIAppFonts:
+          - JetBrainsMono-Regular.ttf
+          - JetBrainsMono-Medium.ttf
+          - JetBrainsMono-Bold.ttf
     dependencies:
       - package: PTAppCore
         product: DataKit

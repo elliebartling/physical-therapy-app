@@ -11,16 +11,22 @@
 		3FEA7FDC27F805D489DB5FFA /* ParsingKit in Frameworks */ = {isa = PBXBuildFile; productRef = E3F874FC2BDA84C2BE82B0DB /* ParsingKit */; };
 		72D13D9AC7C3358950A0D999 /* SessionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 89D0D1F4B4153EFEA596B5E8 /* SessionKit */; };
 		8C2F5F8F0F1FA9BBB1A35DDC /* HistoryKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED2E35DE2DD172573341270A /* HistoryKit */; };
+		9F92A89FD617A7E16713D8EB /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 28A700D5E5AF839136D39314 /* JetBrainsMono-Medium.ttf */; };
 		A44AEA50FADA89DD1378DA56 /* UI in Frameworks */ = {isa = PBXBuildFile; productRef = 64787C01D7E6C0D8960D4158 /* UI */; };
+		BFB7358078B437F7AF006FA8 /* JetBrainsMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AC23F058A5DB58CDF1DF54D6 /* JetBrainsMono-Regular.ttf */; };
+		C497F462E6260CF60DAD562A /* JetBrainsMono-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B524F503C2FF2118B8B303E1 /* JetBrainsMono-Bold.ttf */; };
 		D38BE0CB004F8F8DE562C38C /* DataKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7FD0B7B60AF15E3ABA7E5B9E /* DataKit */; };
 		EFA1D264180C481AD6B6D79F /* PTAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B05F7F6904752DBDD683AC5 /* PTAppApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1D1B78418783578B14FC2D7F /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		28A700D5E5AF839136D39314 /* JetBrainsMono-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Medium.ttf"; sourceTree = "<group>"; };
 		4B05B4ED11ACE9DAFC615F3A /* PTAppCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PTAppCore; path = ../Packages/PTAppCore; sourceTree = SOURCE_ROOT; };
 		5B05F7F6904752DBDD683AC5 /* PTAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PTAppApp.swift; sourceTree = "<group>"; };
 		A1B56281F25E28BB50FE5CF1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		AC23F058A5DB58CDF1DF54D6 /* JetBrainsMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Regular.ttf"; sourceTree = "<group>"; };
+		B524F503C2FF2118B8B303E1 /* JetBrainsMono-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Bold.ttf"; sourceTree = "<group>"; };
 		CB87E03687400FC2A020A0BA /* PTApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PTApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -54,6 +60,7 @@
 				A1B56281F25E28BB50FE5CF1 /* Info.plist */,
 				5B05F7F6904752DBDD683AC5 /* PTAppApp.swift */,
 				1D1B78418783578B14FC2D7F /* RootView.swift */,
+				E4EF3CEEC9D0362531500559 /* Fonts */,
 			);
 			path = PTApp;
 			sourceTree = "<group>";
@@ -75,6 +82,16 @@
 			);
 			sourceTree = "<group>";
 		};
+		E4EF3CEEC9D0362531500559 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				B524F503C2FF2118B8B303E1 /* JetBrainsMono-Bold.ttf */,
+				28A700D5E5AF839136D39314 /* JetBrainsMono-Medium.ttf */,
+				AC23F058A5DB58CDF1DF54D6 /* JetBrainsMono-Regular.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -83,6 +100,7 @@
 			buildConfigurationList = E6CCF34AC98CBADD8BD0AD94 /* Build configuration list for PBXNativeTarget "PTApp" */;
 			buildPhases = (
 				CEAE0A39A2F42529F826ED53 /* Sources */,
+				1015751309A6B5141026A5AC /* Resources */,
 				B06271E725AFAA1D1EFABF8D /* Frameworks */,
 			);
 			buildRules = (
@@ -136,6 +154,19 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1015751309A6B5141026A5AC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C497F462E6260CF60DAD562A /* JetBrainsMono-Bold.ttf in Resources */,
+				9F92A89FD617A7E16713D8EB /* JetBrainsMono-Medium.ttf in Resources */,
+				BFB7358078B437F7AF006FA8 /* JetBrainsMono-Regular.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		CEAE0A39A2F42529F826ED53 /* Sources */ = {
