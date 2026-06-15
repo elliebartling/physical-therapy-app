@@ -75,7 +75,17 @@ public final class SessionEngine {
             await Task.yield()
             await awaitIfPaused()
             currentSetIndex = setIndex
-            continuation.yield(.setStarted(setIndex: setIndex, totalSets: totalSets, side: exercise.side))
+
+            let effectiveSide: Side
+            if exercise.side == .alternating {
+                effectiveSide = setIndex.isMultiple(of: 2) ? .left : .right
+            } else {
+                effectiveSide = exercise.side
+            }
+            continuation.yield(.setStarted(setIndex: setIndex, totalSets: totalSets, side: effectiveSide))
+            if setIndex > 0, exercise.side == .alternating {
+                continuation.yield(.sideSwitch(to: effectiveSide))
+            }
 
             switch exercise.target {
             case .repsSets:
