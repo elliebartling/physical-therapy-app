@@ -11,6 +11,9 @@ let package = Package(
         .library(name: "HistoryKit", targets: ["HistoryKit"]),
         .library(name: "UI", targets: ["UI"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/nalexn/ViewInspector", from: "0.10.0"),
+    ],
     targets: [
         .target(name: "DataKit"),
         .target(name: "ParsingKit", dependencies: ["DataKit"]),
@@ -25,6 +28,12 @@ let package = Package(
         .testTarget(name: "ParsingKitTests", dependencies: ["ParsingKit"], resources: [.process("Fixtures")]),
         .testTarget(name: "SessionKitTests", dependencies: ["SessionKit"]),
         .testTarget(name: "HistoryKitTests", dependencies: ["HistoryKit"]),
-        .testTarget(name: "UITests", dependencies: ["UI"]),
+        .testTarget(
+            name: "UITests",
+            dependencies: [
+                "UI",
+                .product(name: "ViewInspector", package: "ViewInspector"),
+            ]
+        ),
     ]
 )
