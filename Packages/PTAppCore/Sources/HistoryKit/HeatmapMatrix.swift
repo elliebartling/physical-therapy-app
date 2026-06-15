@@ -7,6 +7,13 @@ public struct HeatmapMatrix: Equatable, Sendable {
     public let daysInMonth: Int
     public let completedDayNumbers: Set<Int>
 
+    public init(year: Int, month: Int, daysInMonth: Int, completedDayNumbers: Set<Int>) {
+        self.year = year
+        self.month = month
+        self.daysInMonth = daysInMonth
+        self.completedDayNumbers = completedDayNumbers
+    }
+
     public static func forMonth(
         containing date: Date,
         sessions: [SessionRecord],
