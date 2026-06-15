@@ -1,0 +1,50 @@
+name: PTApp
+options:
+  bundleIdPrefix: com.ptapp.dev
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGNING_REQUIRED: NO         # simulator-only dev
+    CODE_SIGNING_ALLOWED: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+packages:
+  PTAppCore:
+    path: ../Packages/PTAppCore
+
+targets:
+  PTApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: PTApp
+    info:
+      path: PTApp/Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSCameraUsageDescription: "Used to scan your PT handout for setup."
+        NSPhotoLibraryUsageDescription: "Used to pick a photo of your PT handout."
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    dependencies:
+      - package: PTAppCore
+        product: DataKit
+      - package: PTAppCore
+        product: ParsingKit
+      - package: PTAppCore
+        product: SessionKit
+      - package: PTAppCore
+        product: HistoryKit
+      - package: PTAppCore
+        product: UI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ptapp.dev.PTApp
+        TARGETED_DEVICE_FAMILY: "1"   # iPhone only for v1
