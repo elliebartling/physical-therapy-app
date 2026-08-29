@@ -1,0 +1,198 @@
+name: Ship TestFlight
+
+# Ships a signed build to App Store Connect / TestFlight.
+# Triggers: manual "Run workflow" only — ship deliberately so a burst of
+# merges to main produces one build you choose, not one per commit.
+#
+# Required repo secrets (same set as read-later; the ASC key and cert can
+# be the same ones since both apps live under team RLQ5M29933):
+#   APP_STORE_CONNECT_API_KEY_ID    — Key ID (e.g. GM7RX2Y3B8)
+#   APP_STORE_CONNECT_ISSUER_ID     — Issuer UUID
+#   APP_STORE_CONNECT_API_KEY_P8    — full .p8 private key contents
+#   DIST_CERT_P12_BASE64            — Apple Distribution cert, base64 .p12
+#   DIST_CERT_PASSWORD              — password for that .p12
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ship-testflight
+  cancel-in-progress: true
+
+jobs:
+  ship:
+    # macos-26 ships Xcode 26 (iOS 26 SDK). App Store Connect rejects uploads
+    # built with an older SDK — see the "Select Xcode" step for the guard.
+    runs-on: macos-26
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+      # No builds uploaded before Actions took over. First ship → 1.
+      BUILD_NUMBER_OFFSET: 0
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check App Store Connect secrets
+        env:
+          ASC_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_API_KEY_P8" ]; then
+            echo "::error::Missing App Store Connect secrets. Set APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_ISSUER_ID, and APP_STORE_CONNECT_API_KEY_P8 on this repo."
+            exit 1
+          fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Select Xcode
+        run: |
+          # App Store Connect requires the iOS 26 SDK (Xcode 26+). If the
+          # default Xcode is older, pick the newest Xcode 26.x on the runner.
+          IOS_SDK=$(xcodebuild -showsdks 2>/dev/null | sed -nE 's/.*iphoneos([0-9]+).*/\1/p' | sort -n | tail -1)
+          if [ -z "$IOS_SDK" ] || [ "$IOS_SDK" -lt 26 ]; then
+            NEWER=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+            if [ -n "$NEWER" ]; then
+              echo "Default Xcode has iOS SDK '$IOS_SDK'; switching to $NEWER"
+              export DEVELOPER_DIR="$NEWER/Contents/Developer"
+              echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+            fi
+          fi
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          xcodebuild -version
+          IOS_SDK=$(xcodebuild -showsdks 2>/dev/null | sed -nE 's/.*iphoneos([0-9]+).*/\1/p' | sort -n | tail -1)
+          echo "Selected iOS SDK: ${IOS_SDK:-unknown}"
+          if [ -z "$IOS_SDK" ] || [ "$IOS_SDK" -lt 26 ]; then
+            echo "::error::iOS SDK $IOS_SDK is too old. App Store Connect requires the iOS 26 SDK (Xcode 26+). No suitable Xcode found on this runner."
+            exit 1
+          fi
+
+      - name: Set build number
+        id: version
+        run: |
+          BUILD=$(( ${{ github.run_number }} + BUILD_NUMBER_OFFSET ))
+          MARKETING=$(grep -E '^\s*MARKETING_VERSION:' project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          sed -i '' -E "s/CURRENT_PROJECT_VERSION: \"[^\"]+\"/CURRENT_PROJECT_VERSION: \"${BUILD}\"/" project.yml
+          echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "marketing=${MARKETING}" >> "$GITHUB_OUTPUT"
+          echo "Shipping ${MARKETING} (${BUILD})"
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          KEY_PATH="$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s\n' "$ASC_API_KEY_P8" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+
+      - name: Import distribution certificate
+        env:
+          DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
+          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        run: |
+          if [ -z "$DIST_CERT_P12_BASE64" ] || [ -z "$DIST_CERT_PASSWORD" ]; then
+            echo "::error::Missing DIST_CERT_P12_BASE64 / DIST_CERT_PASSWORD secrets."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/ship.keychain-db"
+          KEYCHAIN_PASS=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          printf '%s' "$DIST_CERT_P12_BASE64" | base64 -d > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "$DIST_CERT_PASSWORD" -A -f pkcs12 -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/dist.p12"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN" > /dev/null
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      # Archive SIGNED with the imported Apple Distribution cert and the
+      # named App Store profiles (project.yml pins them per target for
+      # Release). -allowProvisioningUpdates lets xcodebuild download the
+      # named profiles via the ASC API key.
+      - name: Archive (signed, manual)
+        run: |
+          rm -rf build/Mend.xcarchive build/export build/DerivedData
+          set -o pipefail
+          xcodebuild archive \
+            -project Mend.xcodeproj \
+            -scheme Mend \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Mend.xcarchive \
+            -derivedDataPath build/DerivedData \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | tail -80
+
+      - name: Export signed IPA
+        run: |
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath build/Mend.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ci/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | tee /tmp/export.log | tail -40
+          test -f build/export/Mend.ipa
+
+      # On failure, capture Xcode's real distribution errors (the console
+      # summary hides the underlying Apple service responses).
+      - name: Collect signing diagnostics
+        if: failure()
+        run: |
+          mkdir -p build/diagnostics
+          cp /tmp/export.log build/diagnostics/ 2>/dev/null || true
+          find /var/folders -type d -name "*.xcdistributionlogs" -exec cp -R {} build/diagnostics/ \; 2>/dev/null || true
+          ls -R build/diagnostics | head -40
+
+      - name: Upload signing diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signing-diagnostics
+          path: build/diagnostics
+          if-no-files-found: warn
+
+      # Tripwire: a build without the HealthKit entitlement can't save
+      # workouts even though it uploads and installs fine. Fail the run
+      # instead of shipping it.
+      - name: Verify entitlements survived signing
+        run: |
+          unzip -q build/export/Mend.ipa -d build/ipa-check
+          APP="build/ipa-check/Payload/Mend.app"
+          WATCH="$APP/Watch/MendWatch.app"
+          FAIL=0
+          for BIN in "$APP" "$WATCH"; do
+            echo "=== entitlements: $BIN ==="
+            if ! codesign -d --entitlements :- "$BIN" 2>/dev/null | tee /tmp/ent.plist | grep -q "com.apple.developer.healthkit"; then
+              echo "::error::HealthKit entitlement missing from ${BIN} — check the App ID capabilities and the App Store profiles."
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app \
+            -f build/export/Mend.ipa \
+            -t ios \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+          echo "Uploaded ${{ steps.version.outputs.marketing }} (${{ steps.version.outputs.build }}) — processing usually takes 5–15 minutes."

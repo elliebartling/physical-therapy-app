@@ -1,0 +1,65 @@
+name: CI
+
+# macOS runner minutes bill at 10x on private repos, so this workflow is
+# deliberately stingy (same shape as ReadLater's):
+#   - Feature branches are covered by their PR run only.
+#   - Doc/agent-config changes skip the Mac job entirely (paths-ignore).
+#   - One `xcodebuild test` pass builds the app + embedded watch app and
+#     runs the tests.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".agents/**"
+      - "LICENSE"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".agents/**"
+      - "LICENSE"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    # Keep this tight: a hung build bills 10 minutes for every minute it
+    # sits here.
+    timeout-minutes: 25
+    defaults:
+      run:
+        # Explicit `shell: bash` runs with `-eo pipefail` — without it the
+        # `xcodebuild | tail` pipe below masks failures and the job goes
+        # green on a broken build.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Pick a simulator
+        id: sim
+        run: |
+          DEVICE=$(xcrun simctl list devices available | grep -E 'iPhone (1[5-9]|SE)' | head -1 | sed -E 's/^ *([^(]+) \(.*/\1/' | xargs)
+          echo "device=${DEVICE:-iPhone 16}" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: ${DEVICE:-iPhone 16}"
+
+      - name: Build & test
+        run: |
+          xcodebuild test \
+            -project Mend.xcodeproj \
+            -scheme Mend \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tail -150
