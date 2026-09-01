@@ -30,7 +30,7 @@ public final class SetupViewModel {
             phase = .editing
         } catch {
             draft = .init(name: "My routine", exercises: [])
-            phase = .failed(error.localizedDescription)
+            phase = .failed("We couldn't read that photo. Try again with more light and the page held flat — or enter your routine manually.")
         }
     }
 
