@@ -51,6 +51,19 @@ final class HeuristicExtractorTests: XCTestCase {
         XCTAssertEqual(ex.durationSec, 120)
     }
 
+    func test_trailingHoldCue_doesNotEraseAlreadyParsedReps() async throws {
+        let ex = try await parse(["Bridge 3x10 (hold 3 sec at top)"])[0]
+        XCTAssertEqual(ex.reps, 10)
+        XCTAssertEqual(ex.sets, 3)
+        XCTAssertNil(ex.durationSec)
+    }
+
+    func test_wordFormReps_takesPriorityOverTrailingHoldCue() async throws {
+        let ex = try await parse(["Quad sets 10 reps, hold 5 seconds"])[0]
+        XCTAssertEqual(ex.reps, 10)
+        XCTAssertNil(ex.durationSec)
+    }
+
     // Rest
 
     func test_restSeconds() async throws {

@@ -62,9 +62,9 @@ struct GenerableExercise {
         let normalizedSide = side.lowercased().trimmingCharacters(in: .whitespaces)
         return .init(
             name: name,
-            reps: reps,
+            reps: reps.map { max(0, $0) },
             sets: max(1, sets),
-            durationSec: durationSec,
+            durationSec: durationSec.map { max(0, $0) },
             restSec: max(0, restSec),
             side: validSides.contains(normalizedSide) ? normalizedSide : "both",
             notes: notes

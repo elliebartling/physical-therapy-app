@@ -55,12 +55,11 @@ public struct HeuristicExtractor: RoutineExtractor {
             reps = Int(g[1])                                    // bare "x15"
         }
 
-        if durationSec == nil, let g = text.stripFirstMatch(#"(?:hold\s*)?(\d+)\s*(min(?:ute)?s?|sec(?:ond)?s?)\b"#) {
-            durationSec = seconds(g[1], unit: g[2])             // "hold 30 sec", "2 min"
-            reps = nil
-        }
-        if reps == nil, durationSec == nil, let g = text.stripFirstMatch(#"(\d+)\s*reps?\b"#) {
+        if reps == nil, let g = text.stripFirstMatch(#"(\d+)\s*reps?\b"#) {
             reps = Int(g[1])
+        }
+        if durationSec == nil, reps == nil, let g = text.stripFirstMatch(#"(?:hold\s*)?(\d+)\s*(min(?:ute)?s?|sec(?:ond)?s?)\b"#) {
+            durationSec = seconds(g[1], unit: g[2])             // "hold 30 sec", "2 min"
         }
         if reps == nil, durationSec == nil { reps = 10 }        // floor: default 3 x 10
 

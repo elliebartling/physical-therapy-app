@@ -1,5 +1,8 @@
 import Foundation
 import UIKit
+import os
+
+private let logger = Logger(subsystem: "PTAppCore", category: "parsing")
 
 public struct RoutineParser: Sendable {
     public let ocr: OCRService
@@ -22,9 +25,20 @@ public struct RoutineParser: Sendable {
     /// Walks the chain: skips unavailable extractors, falls through on throw.
     func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine {
         var lastError: Error = ParsingError.allExtractorsFailed
-        for extractor in extractors where extractor.isAvailable {
-            do { return try await extractor.extract(fromOCRLines: lines) }
-            catch { lastError = error }
+        for extractor in extractors {
+            let name = String(describing: type(of: extractor))
+            guard extractor.isAvailable else {
+                logger.debug("\(name, privacy: .public) skipped: unavailable")
+                continue
+            }
+            do {
+                let result = try await extractor.extract(fromOCRLines: lines)
+                logger.debug("\(name, privacy: .public) succeeded")
+                return result
+            } catch {
+                logger.error("\(name, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+                lastError = error
+            }
         }
         throw lastError
     }
