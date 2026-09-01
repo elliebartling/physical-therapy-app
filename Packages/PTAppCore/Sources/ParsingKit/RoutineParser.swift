@@ -7,7 +7,7 @@ public struct RoutineParser: Sendable {
 
     public init(
         ocr: OCRService = .init(),
-        extractors: [RoutineExtractor] = [FoundationModelsParser(), HeuristicExtractor()]
+        extractors: [RoutineExtractor] = [FoundationModelsExtractor(), HeuristicExtractor()]
     ) {
         self.ocr = ocr
         self.extractors = extractors
