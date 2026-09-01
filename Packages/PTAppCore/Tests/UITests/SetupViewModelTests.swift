@@ -12,7 +12,7 @@ final class SetupViewModelTests: XCTestCase {
         let canned = ParsedRoutine(name: "Knee", exercises: [
             .init(name: "Squat", reps: 10, sets: 3, durationSec: nil, restSec: 30, side: "both", notes: "")
         ])
-        let parser = RoutineParser(ocr: OCRService(), extractor: StubExtractor(result: canned))
+        let parser = RoutineParser(ocr: OCRService(), extractors: [StubExtractor(result: canned)])
         let vm = SetupViewModel(routineRepo: repo, parser: parser)
 
         vm.draft = canned

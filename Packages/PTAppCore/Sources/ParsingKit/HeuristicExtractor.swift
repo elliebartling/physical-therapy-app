@@ -4,6 +4,8 @@ import Foundation
 /// with cheap regex heuristics. Worst case a line becomes a name-only
 /// draft with the default 3 x 10 target.
 public struct HeuristicExtractor: RoutineExtractor {
+    public var isAvailable: Bool { true }
+
     public init() {}
 
     public func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine {

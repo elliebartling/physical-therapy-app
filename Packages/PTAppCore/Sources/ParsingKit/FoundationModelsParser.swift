@@ -1,10 +1,6 @@
 import Foundation
 import DataKit
 
-public protocol RoutineExtractor: Sendable {
-    func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine
-}
-
 public struct FoundationModelsParser: RoutineExtractor {
     public init() {}
 
@@ -41,11 +37,4 @@ public struct FoundationModelsParser: RoutineExtractor {
         \(lines.joined(separator: "\n"))
         """
     }
-}
-
-/// Test double — returns a canned ParsedRoutine.
-public struct StubExtractor: RoutineExtractor {
-    public let result: ParsedRoutine
-    public init(result: ParsedRoutine) { self.result = result }
-    public func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine { result }
 }
