@@ -1,0 +1,164 @@
+name: Ship TestFlight
+
+# Ships a signed build of Eccentric to App Store Connect / TestFlight.
+# Manual "Run workflow" only — ship deliberately, one build you choose.
+#
+# Required repo secrets (same values as read-later; they are team-level):
+#   APP_STORE_CONNECT_API_KEY_ID    — Key ID
+#   APP_STORE_CONNECT_ISSUER_ID     — Issuer UUID
+#   APP_STORE_CONNECT_API_KEY_P8    — full .p8 private key contents
+#   DIST_CERT_P12_BASE64            — Apple Distribution cert, base64 .p12
+#   DIST_CERT_PASSWORD              — the .p12 export password
+#
+# Signing is automatic (no app groups or other entitlements to pin), so
+# xcodebuild creates the App Store profile itself via the API key.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ship-testflight
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ship:
+    runs-on: macos-26
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      # No builds uploaded manually yet; first Actions ship → build 1.
+      BUILD_NUMBER_OFFSET: 0
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check App Store Connect secrets
+        env:
+          ASC_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_API_KEY_P8" ]; then
+            echo "::error::Missing App Store Connect secrets. Set APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_ISSUER_ID, and APP_STORE_CONNECT_API_KEY_P8 on this repo."
+            exit 1
+          fi
+
+      - name: Select Xcode 26
+        run: |
+          # App Store Connect rejects uploads built with an SDK older than iOS 26.
+          NEWEST=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$NEWEST" ]; then sudo xcode-select -s "$NEWEST/Contents/Developer"; fi
+          xcodebuild -version
+          IOS_SDK=$(xcodebuild -showsdks 2>/dev/null | sed -nE 's/.*iphoneos([0-9]+).*/\1/p' | sort -n | tail -1)
+          echo "iOS SDK: ${IOS_SDK:-unknown}"
+          if [ -z "$IOS_SDK" ] || [ "$IOS_SDK" -lt 26 ]; then
+            echo "::error::iOS SDK $IOS_SDK is too old; App Store Connect requires iOS 26+."
+            exit 1
+          fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Set build number
+        id: version
+        run: |
+          BUILD=$(( ${{ github.run_number }} + BUILD_NUMBER_OFFSET ))
+          MARKETING=$(grep -E '^\s*MARKETING_VERSION:' App/project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          sed -i '' -E "s/CURRENT_PROJECT_VERSION: \"[^\"]+\"/CURRENT_PROJECT_VERSION: \"${BUILD}\"/" App/project.yml
+          echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "marketing=${MARKETING}" >> "$GITHUB_OUTPUT"
+          echo "Shipping Eccentric ${MARKETING} (${BUILD})"
+
+      - name: Generate project
+        run: xcodegen generate --spec App/project.yml --project App
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          printf '%s\n' "$ASC_API_KEY_P8" > "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Import distribution certificate
+        env:
+          DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
+          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        run: |
+          if [ -z "$DIST_CERT_P12_BASE64" ] || [ -z "$DIST_CERT_PASSWORD" ]; then
+            echo "::error::Missing DIST_CERT_P12_BASE64 / DIST_CERT_PASSWORD secrets."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/ship.keychain-db"
+          KEYCHAIN_PASS=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          printf '%s' "$DIST_CERT_P12_BASE64" | base64 -d > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "$DIST_CERT_PASSWORD" -A -f pkcs12 -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/dist.p12"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN" > /dev/null
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Archive (signed)
+        run: |
+          rm -rf build
+          set -o pipefail
+          xcodebuild archive \
+            -project App/PTApp.xcodeproj \
+            -scheme PTApp \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Eccentric.xcarchive \
+            -derivedDataPath build/DerivedData \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | tail -80
+
+      - name: Export signed IPA
+        run: |
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath build/Eccentric.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ci/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | tee /tmp/export.log | tail -40
+          test -f build/export/PTApp.ipa
+
+      - name: Collect signing diagnostics
+        if: failure()
+        run: |
+          mkdir -p build/diagnostics
+          cp /tmp/export.log build/diagnostics/ 2>/dev/null || true
+          find /var/folders -type d -name "*.xcdistributionlogs" -exec cp -R {} build/diagnostics/ \; 2>/dev/null || true
+
+      - name: Upload signing diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signing-diagnostics
+          path: build/diagnostics
+          if-no-files-found: warn
+
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app \
+            -f build/export/PTApp.ipa \
+            -t ios \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+          echo "Uploaded Eccentric ${{ steps.version.outputs.marketing }} (${{ steps.version.outputs.build }}) — processing usually takes 5–15 minutes."
