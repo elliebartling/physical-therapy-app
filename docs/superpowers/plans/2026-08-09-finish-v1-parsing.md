@@ -17,20 +17,24 @@
 - XCTest only (matches existing suite; do not introduce Swift Testing).
 - Commit message style from git log: `feat(ParsingKit): …`, `fix(UI): …`, `test(UI): …`.
 - ParsingKit must not import SwiftUI. `import FoundationModels` may appear ONLY in `FoundationModelsExtractor.swift`.
-- Heuristic defaults (must match the LLM prompt): sets 3, reps 10 when nothing parses, restSec 30, side `"both"`.
+- Heuristic defaults (must match the LLM prompt): sets 3, reps 10 when nothing parses, restSec 30, side `"both"`. **Note:** the prompt in `FoundationModelsParser.instruction(for:)` currently defaults only `restSec` and `side` — it says nothing about sets or reps. Making these agree means editing the prompt too, not just the heuristic.
 - Side strings must be one of `"both"`, `"left"`, `"right"`, `"alternating"` (they feed `Side(rawValue:)` in `ParsedRoutine.toRoutine()`).
 
 ## Running tests
 
-From the repo root:
+**Corrected 2026-08-29.** The command previously written here did not work. `-scheme ParsingKit` (and `-scheme PTApp`) fail with `error: Scheme ParsingKit is not currently configured for the test action` — the generated project contains no `.xcscheme` files, and Xcode's implicit package schemes carry no test action. Tests run against the package's aggregate scheme, from `Packages/PTAppCore`:
 
 ```bash
-xcodebuild test -project App/PTApp.xcodeproj -scheme ParsingKit \
+cd Packages/PTAppCore && xcodebuild test \
+  -scheme PTAppCore-Package \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -only-testing:ParsingKitTests 2>&1 | tail -20
+  -only-testing:ParsingKitTests \
+  CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
 ```
 
-Swap `-scheme ParsingKit`/`ParsingKitTests` for `UI`/`UITests` for UI-layer tasks. Narrow with `-only-testing:ParsingKitTests/HeuristicExtractorTests`. If the package scheme misbehaves from the CLI, `Cmd-U` in Xcode runs everything.
+Verified: the full scheme runs all five bundles (33 tests, `** TEST SUCCEEDED **`), and `-only-testing` correctly narrows — e.g. `-only-testing:HistoryKitTests/StreakCalculatorTests` runs exactly 6. Swap `ParsingKitTests` for `UITests` for UI-layer tasks, or narrow to `-only-testing:ParsingKitTests/HeuristicExtractorTests`.
+
+Once the orchestration work lands (`docs/superpowers/specs/2026-08-09-orchestration-setup-design.md`), this becomes `make test`; prefer that when it exists.
 
 ---
 
@@ -738,7 +742,8 @@ Run all ParsingKitTests on the simulator. Expected: everything PASSES, with `tes
 Connect the Apple Intelligence iPhone, then:
 
 ```bash
-xcodebuild test -project App/PTApp.xcodeproj -scheme ParsingKit \
+cd Packages/PTAppCore && xcodebuild test \
+  -scheme PTAppCore-Package \
   -destination 'platform=iOS,name=YOUR_IPHONE_NAME' \
   -only-testing:ParsingKitTests/FoundationModelsExtractorTests/test_live_extractsFromSampleLines
 ```

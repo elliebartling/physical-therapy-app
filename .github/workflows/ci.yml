@@ -1,0 +1,78 @@
+name: CI
+
+# Runs the full PTAppCore test suite on every PR and every push to main.
+# Always reports (no paths-ignore) so it can safely be a required check —
+# a path-filtered workflow that never runs leaves a required check Pending
+# forever and blocks doc-only PRs.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$NEWEST" ]; then sudo xcode-select -s "$NEWEST/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate --spec App/project.yml --project App
+
+      - name: Pick a simulator
+        run: |
+          # Don't hardcode a device name; runner images rotate them.
+          UDID=$(xcrun simctl list devices available -j \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; ds=[x for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]; print(ds[-1]["udid"])')
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          echo "Using simulator $UDID"
+
+      - name: Build app target
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project App/PTApp.xcodeproj -scheme PTApp \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            CODE_SIGNING_ALLOWED=NO | tail -40
+
+      - name: Test PTAppCore (all five bundles)
+        run: |
+          set -o pipefail
+          cd Packages/PTAppCore
+          xcodebuild test -scheme PTAppCore-Package \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -resultBundlePath "$RUNNER_TEMP/tests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO | tee "$RUNNER_TEMP/test.log" | tail -60
+
+      - name: Assert all five test bundles ran
+        run: |
+          # A green run with a bundle silently dropped looks identical to a
+          # correct one — pin the bundle set, not a test count.
+          FAIL=0
+          for B in DataKitTests HistoryKitTests ParsingKitTests SessionKitTests UITests; do
+            if ! grep -q "Test Suite '$B.xctest' passed" "$RUNNER_TEMP/test.log"; then
+              echo "::error::$B did not run or did not pass"; FAIL=1
+            fi
+          done
+          exit $FAIL

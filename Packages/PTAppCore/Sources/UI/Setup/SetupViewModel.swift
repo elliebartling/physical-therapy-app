@@ -3,6 +3,9 @@ import UIKit
 import Observation
 import DataKit
 import ParsingKit
+import os
+
+private let logger = Logger(subsystem: "PTAppCore", category: "setup")
 
 @MainActor
 @Observable
@@ -30,7 +33,12 @@ public final class SetupViewModel {
             phase = .editing
         } catch {
             draft = .init(name: "My routine", exercises: [])
-            phase = .failed(error.localizedDescription)
+            if case ParsingError.noTextFound = error {
+                phase = .failed("We couldn't read that photo. Try again with more light and the page held flat — or enter your routine manually.")
+            } else {
+                logger.error("Routine parse failed: \(String(describing: error), privacy: .public)")
+                phase = .failed("Something went wrong reading that photo. Try again, or enter your routine manually.")
+            }
         }
     }
 

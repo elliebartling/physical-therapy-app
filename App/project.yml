@@ -1,6 +1,6 @@
 name: PTApp
 options:
-  bundleIdPrefix: com.ptapp.dev
+  bundleIdPrefix: com.ellenbartling
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
@@ -11,8 +11,7 @@ settings:
     SWIFT_VERSION: "6.0"
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     CODE_SIGN_STYLE: Automatic
-    CODE_SIGNING_REQUIRED: NO         # simulator-only dev
-    CODE_SIGNING_ALLOWED: NO
+    DEVELOPMENT_TEAM: "RLQ5M29933"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 
 packages:
@@ -28,6 +27,8 @@ targets:
     info:
       path: PTApp/Info.plist
       properties:
+        CFBundleDisplayName: Eccentric
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         NSCameraUsageDescription: "Used to scan your PT handout for setup."
         NSPhotoLibraryUsageDescription: "Used to pick a photo of your PT handout."
@@ -50,5 +51,7 @@ targets:
         product: UI
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ptapp.dev.PTApp
+        PRODUCT_BUNDLE_IDENTIFIER: com.ellenbartling.ptroutine
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only for v1
