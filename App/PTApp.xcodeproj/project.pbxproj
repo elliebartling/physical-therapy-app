@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2191CE3A20DC30FF505ED1F1 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1B78418783578B14FC2D7F /* RootView.swift */; };
 		3FEA7FDC27F805D489DB5FFA /* ParsingKit in Frameworks */ = {isa = PBXBuildFile; productRef = E3F874FC2BDA84C2BE82B0DB /* ParsingKit */; };
+		4056EA68484780B4C076B76E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 935E3A1E1412428CF717CFFB /* Assets.xcassets */; };
 		72D13D9AC7C3358950A0D999 /* SessionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 89D0D1F4B4153EFEA596B5E8 /* SessionKit */; };
 		8C2F5F8F0F1FA9BBB1A35DDC /* HistoryKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED2E35DE2DD172573341270A /* HistoryKit */; };
 		9F92A89FD617A7E16713D8EB /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 28A700D5E5AF839136D39314 /* JetBrainsMono-Medium.ttf */; };
@@ -24,6 +25,7 @@
 		28A700D5E5AF839136D39314 /* JetBrainsMono-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Medium.ttf"; sourceTree = "<group>"; };
 		4B05B4ED11ACE9DAFC615F3A /* PTAppCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PTAppCore; path = ../Packages/PTAppCore; sourceTree = SOURCE_ROOT; };
 		5B05F7F6904752DBDD683AC5 /* PTAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PTAppApp.swift; sourceTree = "<group>"; };
+		935E3A1E1412428CF717CFFB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1B56281F25E28BB50FE5CF1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AC23F058A5DB58CDF1DF54D6 /* JetBrainsMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Regular.ttf"; sourceTree = "<group>"; };
 		B524F503C2FF2118B8B303E1 /* JetBrainsMono-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Bold.ttf"; sourceTree = "<group>"; };
@@ -57,6 +59,7 @@
 		4DDB05FBB6843602456B5368 /* PTApp */ = {
 			isa = PBXGroup;
 			children = (
+				935E3A1E1412428CF717CFFB /* Assets.xcassets */,
 				A1B56281F25E28BB50FE5CF1 /* Info.plist */,
 				5B05F7F6904752DBDD683AC5 /* PTAppApp.swift */,
 				1D1B78418783578B14FC2D7F /* RootView.swift */,
@@ -161,6 +164,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4056EA68484780B4C076B76E /* Assets.xcassets in Resources */,
 				C497F462E6260CF60DAD562A /* JetBrainsMono-Bold.ttf in Resources */,
 				9F92A89FD617A7E16713D8EB /* JetBrainsMono-Medium.ttf in Resources */,
 				BFB7358078B437F7AF006FA8 /* JetBrainsMono-Regular.ttf in Resources */,
