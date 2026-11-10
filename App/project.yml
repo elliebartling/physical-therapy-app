@@ -28,6 +28,8 @@ targets:
       path: PTApp/Info.plist
       properties:
         CFBundleDisplayName: Eccentric
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleIconName: AppIcon
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
