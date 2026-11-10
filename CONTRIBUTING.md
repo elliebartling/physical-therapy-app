@@ -8,10 +8,9 @@ and signing.
 1. Branch off `main`, edit, push.
 2. Open a pull request. **CI** builds the app and runs all five test suites
    (a few minutes). Its log is your compiler: read errors there.
-3. Once CI is green and the PR is approved, merge to `main`.
+3. Once CI is green, merge it yourself. No review needed.
 
-`main` is protected: changes land only through a PR with a passing CI check
-and an approving review.
+`main` is protected: changes land only through a PR with a passing CI check.
 
 ## Shipping to TestFlight
 
