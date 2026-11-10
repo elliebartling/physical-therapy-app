@@ -126,8 +126,7 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            | tail -80
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
       - name: Export signed IPA
         run: |
@@ -140,8 +139,23 @@ jobs:
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            | tee /tmp/export.log | tail -40
+            | tee /tmp/export.log
           test -f build/export/PTApp.ipa
+
+      - name: Check IPA build number
+        run: |
+          # App Store Connect rejects a reused build number, and only after
+          # the whole archive. Fail here, fast, if the number didn't land.
+          rm -rf "$RUNNER_TEMP/ipa" && mkdir "$RUNNER_TEMP/ipa"
+          unzip -q build/export/PTApp.ipa -d "$RUNNER_TEMP/ipa"
+          PLIST=$(ls -d "$RUNNER_TEMP"/ipa/Payload/*.app)/Info.plist
+          GOT=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")
+          WANT=${{ steps.version.outputs.build }}
+          echo "IPA CFBundleVersion=$GOT (expected $WANT)"
+          if [ "$GOT" != "$WANT" ]; then
+            echo "::error::IPA build number is $GOT, expected $WANT. Info.plist isn't reading CURRENT_PROJECT_VERSION."
+            exit 1
+          fi
 
       - name: Collect signing diagnostics
         if: failure()

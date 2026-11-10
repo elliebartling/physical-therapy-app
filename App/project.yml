@@ -28,6 +28,10 @@ targets:
       path: PTApp/Info.plist
       properties:
         CFBundleDisplayName: Eccentric
+        # Read from build settings so CI's build number reaches the app.
+        # Without these, XcodeGen writes literal "1.0" / "1".
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleIconName: AppIcon
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
