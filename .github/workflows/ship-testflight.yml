@@ -126,8 +126,7 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            | tail -80
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
       - name: Export signed IPA
         run: |
@@ -140,7 +139,7 @@ jobs:
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            | tee /tmp/export.log | tail -40
+            | tee /tmp/export.log
           test -f build/export/PTApp.ipa
 
       - name: Check IPA build number
