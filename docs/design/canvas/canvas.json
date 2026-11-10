@@ -1,0 +1,44 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-10T00:00:00Z" },
+  "title": "Mend — App Design",
+  "launch": { "view": "canvas", "page": "ux" },
+  "pages": [
+    { "id": "dark", "name": "v1 · Dark" },
+    { "id": "directions", "name": "v2 · Directions" },
+    { "id": "ux", "name": "v3 · UX" }
+  ],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Today", "is_interactive": true, "page": "dark" },
+    "player-timed.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "Guided session — timed hold", "is_interactive": true, "page": "dark" },
+    "player-reps.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "Guided session — reps", "is_interactive": true, "page": "dark" },
+    "trends.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 844, "title": "Trends", "is_interactive": true, "page": "dark" },
+    "native-today.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Native — Today", "is_interactive": true, "page": "directions" },
+    "native-timer.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "Native — Timed hold", "is_interactive": true, "page": "directions" },
+    "editorial-today.dc.html": { "x": 1100, "y": 0, "w": 390, "h": 844, "title": "Editorial — Today", "is_interactive": true, "page": "directions" },
+    "editorial-timer.dc.html": { "x": 1570, "y": 0, "w": 390, "h": 844, "title": "Editorial — Timed hold", "is_interactive": true, "page": "directions" },
+    "swissglass-today.dc.html": { "x": 2200, "y": 0, "w": 390, "h": 844, "title": "Swiss + Glass — Today", "is_interactive": true, "page": "directions" },
+    "swissglass-timer.dc.html": { "x": 2670, "y": 0, "w": 390, "h": 844, "title": "Swiss + Glass — Timed hold", "is_interactive": true, "page": "directions" },
+    "swissglass-appearance.dc.html": { "x": 3140, "y": 0, "w": 390, "h": 844, "title": "Swiss + Glass — Appearance (color picker)", "is_interactive": true, "page": "directions" },
+    "swissglass-colors.dc.html": { "x": 2200, "y": 1300, "w": 2620, "h": 954, "title": "Accent color study — timer", "is_interactive": true, "page": "directions" },
+    "ux-flows.dc.html": { "x": 0, "y": 0, "w": 1976, "h": 1080, "title": "UX map — structure and v1 flows", "page": "ux" },
+    "v3-review.dc.html": { "x": 0, "y": 1500, "w": 390, "h": 844, "title": "Import — review", "is_interactive": true, "page": "ux" },
+    "v3-changes.dc.html": { "x": 470, "y": 1500, "w": 390, "h": 844, "title": "Import — what changed", "is_interactive": true, "page": "ux" },
+    "v3-today.dc.html": { "x": 940, "y": 1500, "w": 390, "h": 844, "title": "Today — several routines", "is_interactive": true, "page": "ux" },
+    "v3-rate.dc.html": { "x": 1410, "y": 1500, "w": 390, "h": 844, "title": "Session — rate exercise (optional)", "is_interactive": true, "page": "ux" },
+    "v3-summary.dc.html": { "x": 1880, "y": 1500, "w": 390, "h": 844, "title": "Session — summary", "is_interactive": true, "page": "ux" },
+    "v3-visit.dc.html": { "x": 2350, "y": 1500, "w": 390, "h": 844, "title": "Prepare for your visit", "is_interactive": true, "page": "ux" }
+  },
+  "order": ["Main.dc.html", "player-timed.dc.html", "player-reps.dc.html", "trends.dc.html", "native-today.dc.html", "native-timer.dc.html", "editorial-today.dc.html", "editorial-timer.dc.html", "swissglass-today.dc.html", "swissglass-timer.dc.html", "swissglass-appearance.dc.html", "swissglass-colors.dc.html", "ux-flows.dc.html", "v3-review.dc.html", "v3-changes.dc.html", "v3-today.dc.html", "v3-rate.dc.html", "v3-summary.dc.html", "v3-visit.dc.html"],
+  "notes": {
+    "title": { "x": 0, "y": -300, "text": "Mend — dark, premium, focused", "kind": "title1", "maxW": 1800, "page": "dark" },
+    "nativeTitle": { "x": 0, "y": -300, "text": "A · Native Liquid Glass", "kind": "title1", "maxW": 860, "page": "directions" },
+    "editorialTitle": { "x": 1100, "y": -300, "text": "B · Editorial / Swiss", "kind": "title1", "maxW": 860, "page": "directions" },
+    "swissGlassTitle": { "x": 2200, "y": -300, "text": "C · Swiss + Liquid Glass", "kind": "title1", "maxW": 1330, "page": "directions" },
+    "colorsTitle": { "x": 2200, "y": 1000, "text": "C · Accent colors", "kind": "title1", "maxW": 2620, "page": "directions" },
+    "uxScreensTitle": { "x": 0, "y": 1220, "text": "v1 screens — new and changed, in flow order", "kind": "title1", "maxW": 2740, "page": "ux" },
+    "interruptNote": { "x": 2056, "y": 576, "w": 300, "text": "Interrupted mid-session (a call, the app closes): the session pauses and saves. Reopen within a few hours to resume where you left off; after that it's kept as a partial session.", "fill": "orange", "page": "ux" },
+    "ratingNote": { "x": 2056, "y": 900, "w": 300, "text": "Ratings: Settings › Rate exercises = after each (default), at the end, or off. The summary always lists unrated exercises, and skipping is always fine.", "fill": "teal", "page": "ux" }
+  },
+  "designSystems": []
+}

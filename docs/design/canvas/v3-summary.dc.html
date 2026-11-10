@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mend — Session summary</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body { margin: 0; }
+</style>
+</helmet>
+<div style="box-sizing: border-box; position: relative; width: 390px; height: 844px; overflow: hidden; background: #F3F2EE; color: #111111; font-family: 'Inter Tight', 'Helvetica Neue', Arial, sans-serif; padding: 58px 20px 0;">
+  <div style="display: flex; align-items: center; justify-content: space-between; min-height: 32px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em;">
+    <span style="color: #57564F;">SESSION COMPLETE</span>
+    <span style="display: flex; align-items: center; gap: 6px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9.3C1 8.2 3.2 4.5 6.9 4.5c2.1 0 3.8 1.1 5.1 2.9 1.3-1.8 3-2.9 5.1-2.9 3.7 0 5.9 3.7 4.4 7.2C19.5 16.4 12 21 12 21z"></path></svg>
+      SAVED TO HEALTH
+    </span>
+  </div>
+  <div style="height: 2px; background: #111111; margin-top: 8px;"></div>
+
+  <h1 style="margin: 18px 0 0; font-size: 44px; font-weight: 700; line-height: 0.98; letter-spacing: -0.045em;">Knee Rehab, done.</h1>
+  <div style="margin-top: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; color: #3D3C37;">18:42 — 6 OF 6 — 3 OF 3 THIS WEEK</div>
+
+  <div style="margin-top: 20px; height: 1px; background: #111111;"></div>
+  <div style="margin-top: 10px; display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: #57564F;">
+    <span>01 — HOW IT FELT</span>
+    <span style="color: #111111;">{{unratedLabel}}</span>
+  </div>
+
+  <div style="margin-top: 6px;">
+    <sc-for list="{{rows}}" as="row" hint-placeholder-count="6">
+      <div style="padding: 9px 0; border-bottom: 1px solid rgba(17,17,17,0.15);">
+        <div style="display: grid; grid-template-columns: 28px 1fr auto; align-items: baseline;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #57564F;">{{row.n}}</span>
+          <span style="font-size: 16px; font-weight: 500;">{{row.name}}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em;">{{row.chip}}</span>
+        </div>
+        <sc-if value="{{row.open}}" hint-placeholder-val="{{false}}">
+          <div role="group" aria-label="Rate {{row.name}}" style="margin: 8px 0 2px 28px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;">
+            <sc-for list="{{row.options}}" as="opt" hint-placeholder-count="4">
+              <button type="button" aria-pressed="{{opt.pressed}}" onClick="{{opt.pick}}" style="box-sizing: border-box; cursor: pointer; height: 34px; padding: 0 4px; border-radius: 999px; border: 1.5px solid #111111; background: {{opt.bg}}; color: {{opt.fg}}; font-family: inherit; font-size: 13px; font-weight: 600;">{{opt.label}}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: baseline; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: #57564F;">
+    <span>02 — PAIN TODAY</span>
+    <span style="font-family: 'Inter Tight', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #111111;">{{pain}}<span style="font-size: 13px; font-weight: 500; color: #57564F;"> / 10</span></span>
+  </div>
+  <div role="group" aria-label="Pain today, 0 to 10" style="margin-top: 8px; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 3px;">
+    <sc-for list="{{painSteps}}" as="step" hint-placeholder-count="11">
+      <button type="button" aria-label="Pain {{step.value}}" aria-pressed="{{step.pressed}}" onClick="{{step.pick}}" style="box-sizing: border-box; cursor: pointer; height: 36px; padding: 0; border-radius: 6px; border: {{step.border}}; background: {{step.bg}}; color: #111111; font-family: 'IBM Plex Mono', monospace; font-size: 11px;">{{step.value}}</button>
+    </sc-for>
+  </div>
+  <div style="margin-top: 6px; display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.06em; color: #57564F;">
+    <span>NONE</span>
+    <span>WORST</span>
+  </div>
+
+  <div style="box-sizing: border-box; position: absolute; left: 20px; right: 20px; bottom: 34px; height: 72px; border-radius: 999px; padding: 6px; display: flex; gap: 6px; background: rgba(255,255,255,0.42); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 10px 28px rgba(17,17,17,0.14), inset 0 1px 1px rgba(255,255,255,0.95), inset 0 -1px 1px rgba(17,17,17,0.06); backdrop-filter: blur(18px) saturate(180%); -webkit-backdrop-filter: blur(18px) saturate(180%);">
+    <button type="button" aria-label="Add a note for your PT" style="box-sizing: border-box; cursor: pointer; width: 60px; height: 60px; padding: 0; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.6); border: 1px solid rgba(17,17,17,0.08); box-shadow: inset 0 1px 1px rgba(255,255,255,0.9); color: #111111;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="M13 7l4 4"></path></svg>
+    </button>
+    <a href="v3-today.dc.html" style="box-sizing: border-box; text-decoration: none; flex: 1; height: 60px; border-radius: 999px; padding: 0 22px; display: flex; align-items: center; justify-content: space-between; background: rgba(17,17,17,0.84); border: 1px solid rgba(255,255,255,0.12); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.3); color: #F3F2EE; font-size: 17px; font-weight: 600; letter-spacing: -0.01em;">
+      <span>Done</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#FF5A1F","options":["#FF5A1F","#3FA9F5","#FFC531","#2BD99F"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const accent = this.props.accent ?? '#FF5A1F';
+    const st = this.state || {};
+    const picks = st.picks || {};
+    const pain = st.pain ?? 2;
+    const base = [
+      { n: '01', name: 'Bridges', rated: 'EASY' },
+      { n: '02', name: 'Clamshells', rated: 'ABOUT RIGHT' },
+      { n: '03', name: 'Side plank', rated: 'HARD' },
+      { n: '04', name: 'Single-leg bridge', rated: null },
+      { n: '05', name: 'Heel raises', rated: 'ABOUT RIGHT' },
+      { n: '06', name: 'Terminal knee extension', rated: null }
+    ];
+    const labels = ['Easy', 'About right', 'Hard', 'Painful'];
+    let unrated = 0;
+    const rows = base.map((r) => {
+      const open = !r.rated;
+      const picked = picks[r.n];
+      if (open && !picked) unrated += 1;
+      return {
+        n: r.n,
+        name: r.name,
+        open,
+        chip: r.rated ? r.rated : (picked ? '' : 'NOT RATED'),
+        options: labels.map((label) => {
+          const on = picked === label;
+          return {
+            label,
+            pressed: on ? 'true' : 'false',
+            bg: on ? '#111111' : 'transparent',
+            fg: on ? '#F3F2EE' : '#111111',
+            pick: () => this.setState({ picks: { ...picks, [r.n]: label } })
+          };
+        })
+      };
+    });
+    const painSteps = Array.from({ length: 11 }, (_, v) => ({
+      value: String(v),
+      pressed: v === pain ? 'true' : 'false',
+      bg: v === pain ? accent : 'transparent',
+      border: v === pain ? '1.5px solid #111111' : '1px solid rgba(17,17,17,0.18)',
+      pick: () => this.setState({ pain: v })
+    }));
+    return {
+      rows,
+      painSteps,
+      pain: String(pain),
+      unratedLabel: unrated === 0 ? 'ALL RATED' : unrated + ' TO RATE — OPTIONAL'
+    };
+  }
+}
+</script>
+</body>
+</html>
