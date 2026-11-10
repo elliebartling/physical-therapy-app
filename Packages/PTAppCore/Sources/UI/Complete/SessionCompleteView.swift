@@ -4,7 +4,10 @@ public struct SessionCompleteView: View {
     public let newStreak: Int
     public let onDone: () -> Void
 
-    @State private var pulse = false
+    @State private var appeared = false
+    @Environment(\.appAccent) private var accent
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(newStreak: Int, onDone: @escaping () -> Void) {
         self.newStreak = newStreak
@@ -12,22 +15,72 @@ public struct SessionCompleteView: View {
     }
 
     public var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             AppColor.surface.ignoresSafeArea()
-            VStack(spacing: AppSpacing.s(3)) {
-                Text("Nice work").font(AppFont.mono(28, weight: .medium))
-                Text("\(newStreak)")
-                    .font(AppFont.mono(140, weight: .bold))
-                    .foregroundStyle(AppColor.accent)
-                    .scaleEffect(pulse ? 1.0 : 0.6)
-                    .animation(.snappy(duration: 0.4), value: pulse)
-                Text("DAY STREAK").font(AppFont.mono(12, weight: .medium)).tracking(2)
-                Button("Done", action: onDone)
-                    .font(AppFont.mono(18, weight: .medium))
-                    .padding(.top, AppSpacing.s(4))
+            completionField
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(spacing: 10) {
+                    HStack {
+                        SectionLabel("Session complete")
+                        Spacer()
+                    }
+                    InkRule(weight: 2)
+                }
+                .padding(.top, AppSpacing.s(1))
+                Text("Nice work.")
+                    .font(AppFont.display(56, weight: .bold))
+                    .tracking(-2.4)
+                    .padding(.top, 26)
+                Spacer()
+                streak
+                doneButton.padding(.top, AppSpacing.s(3))
             }
-            .padding(AppSpacing.screenPadding)
+            .padding(.horizontal, AppSpacing.screenPadding)
+            .padding(.bottom, AppSpacing.s(1))
         }
-        .onAppear { pulse = true }
+        .foregroundStyle(AppColor.ink)
+        .onAppear { appeared = true }
+    }
+
+    /// The timer field filling back up: the visual "done".
+    private var completionField: some View {
+        Rectangle()
+            .fill(accent.fieldTone(for: colorScheme))
+            .containerRelativeFrame(.vertical) { length, _ in length * (appeared ? 0.5 : 0) }
+            .frame(maxWidth: .infinity)
+            .ignoresSafeArea(edges: .bottom)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.6), value: appeared)
+            .accessibilityHidden(true)
+    }
+
+    private var streak: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 12) {
+            Text("\(newStreak)")
+                .font(AppFont.display(176, weight: .bold))
+                .tracking(-10)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .scaleEffect(appeared || reduceMotion ? 1 : 0.6, anchor: .bottomLeading)
+                .animation(.snappy(duration: 0.4), value: appeared)
+            Text("DAY\nSTREAK")
+                .font(AppFont.mono(12, weight: .medium))
+                .tracking(0.7)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(newStreak)-day streak")
+    }
+
+    private var doneButton: some View {
+        Button(action: onDone) {
+            HStack {
+                Text("Done")
+                Spacer()
+                Image(systemName: "checkmark")
+            }
+            .font(AppFont.display(17, weight: .semibold))
+            .padding(.horizontal, 22)
+        }
+        .buttonStyle(InkGlassButtonStyle())
     }
 }

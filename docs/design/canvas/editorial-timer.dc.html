@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mend editorial — Timed hold</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body { margin: 0; }
+* { box-sizing: border-box; }
+button { font-family: inherit; border: none; background: none; padding: 0; cursor: pointer; }
+a { text-decoration: none; }
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; overflow: hidden; background: #F3F2EE; color: #111111; font-family: 'Inter Tight', 'Helvetica Neue', Arial, sans-serif; display: flex; flex-direction: column; padding: 0 20px;">
+  <div style="padding-top: 58px; display: flex; align-items: center; justify-content: space-between;">
+    <a href="editorial-today.dc.html" style="min-height: 44px; display: flex; align-items: center; gap: 6px; color: #111111; font-size: 15px; font-weight: 600;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M20 12H5"></path><path d="M11 6l-6 6 6 6"></path></svg>
+      End
+    </a>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: #57564F;">EXERCISE 03 / 06</div>
+  </div>
+  <div style="height: 2px; background: #111111; margin-top: 4px;"></div>
+  <div role="img" aria-label="Exercise 3 of 6" style="margin-top: 10px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px;">
+    <div style="height: 4px; background: #111111;"></div>
+    <div style="height: 4px; background: #111111;"></div>
+    <div style="height: 4px; background: {{accent}};"></div>
+    <div style="height: 4px; background: rgba(17,17,17,0.14);"></div>
+    <div style="height: 4px; background: rgba(17,17,17,0.14);"></div>
+    <div style="height: 4px; background: rgba(17,17,17,0.14);"></div>
+  </div>
+
+  <h1 style="margin: 30px 0 0; font-size: 68px; font-weight: 700; line-height: 0.9; letter-spacing: -0.05em; white-space: pre-line;">Side
+plank</h1>
+  <div style="margin-top: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; color: #57564F;">SET 2/3 — LEFT SIDE — HOLD</div>
+
+  <div style="flex: 1;"></div>
+
+  <div role="img" aria-label="18 of 30 seconds remaining">
+    <div style="display: flex; align-items: flex-end; gap: 12px;">
+      <div style="font-size: 200px; font-weight: 700; line-height: 0.78; letter-spacing: -0.07em; color: {{accent}}; font-variant-numeric: tabular-nums;">18</div>
+      <div style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em;">
+        <span>SEC</span>
+        <span style="color: #57564F;">OF 30</span>
+      </div>
+    </div>
+    <div style="margin-top: 20px; height: 10px; background: rgba(17,17,17,0.1);">
+      <div style="width: 60%; height: 100%; background: #111111;"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #57564F;">
+      <span>0</span>
+      <span>30</span>
+    </div>
+  </div>
+
+  <p style="margin: 18px 0 0; max-width: 310px; font-size: 15px; line-height: 1.45; color: #3D3C37;">Stack your hips and keep them lifted. Don’t let them sag toward the floor.</p>
+
+  <div style="margin-top: 18px; padding-top: 10px; border-top: 1px solid rgba(17,17,17,0.15); display: flex; gap: 14px; align-items: baseline;">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: #57564F;">NEXT</span>
+    <span style="font-size: 15px; font-weight: 500;">Rest 0:15, then right side</span>
+  </div>
+
+  <div style="margin-top: 16px; padding-bottom: 36px; display: grid; grid-template-columns: 3fr 1fr; gap: 8px;">
+    <button type="button" style="height: 60px; padding: 0 20px; background: #111111; color: #F3F2EE; display: flex; align-items: center; justify-content: space-between; font-size: 17px; font-weight: 600;">
+      <span>Pause</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+    </button>
+    <button type="button" aria-label="Skip to next step" style="height: 60px; border: 1.5px solid #111111; color: #111111; display: flex; align-items: center; justify-content: center;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 12h15"></path><path d="M13 6l6 6-6 6"></path></svg>
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#E8381B","options":["#E8381B","#1F3FD1","#0F7B53","#111111"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#E8381B' };
+  }
+}
+</script>
+</body>
+</html>

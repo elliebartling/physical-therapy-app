@@ -18,80 +18,223 @@ public struct HomeView: View {
     }
 
     public var body: some View {
-        ZStack(alignment: .topTrailing) {
-            AppColor.surface.ignoresSafeArea()
-
+        Group {
             if viewModel.hasRoutine {
-                VStack(spacing: AppSpacing.s(4)) {
-                    Spacer(minLength: AppSpacing.s(8))
-                    streakBlock
-                    HairlineDivider()
-                    HeatmapView(matrix: viewModel.heatmap)
-                    Spacer()
-                    startButton
-                }
-                .padding(.horizontal, AppSpacing.screenPadding)
+                todayContent
             } else {
-                VStack(spacing: AppSpacing.s(3)) {
-                    Text("No routine yet").font(AppFont.mono(28, weight: .medium))
-                    Text("Set up your routine to begin.").font(AppFont.body(15))
-                    Button("Set up", action: onSetup)
-                        .buttonStyle(AccentButtonStyle())
-                        .padding(.top, AppSpacing.s(2))
-                }
-                .padding(AppSpacing.screenPadding)
+                emptyContent
             }
-
-            Button(action: onSettings) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 22, weight: .thin))
-                    .foregroundStyle(AppColor.text)
-            }
-            .padding(AppSpacing.screenPadding)
         }
+        .background(AppColor.surface.ignoresSafeArea())
+        .foregroundStyle(AppColor.ink)
         .task { await viewModel.refresh() }
     }
 
-    private var streakBlock: some View {
-        VStack(spacing: AppSpacing.s(1)) {
-            Text("\(viewModel.streak)")
-                .font(AppFont.mono(120, weight: .bold))
-                .foregroundStyle(AppColor.accent)
-            Text("DAY STREAK").font(AppFont.mono(12, weight: .medium)).tracking(2)
+    private var todayContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Masthead(onSettings: onSettings)
+                statement.padding(.top, 24)
+                WeekStripView(week: viewModel.week).padding(.top, 20)
+                routineSection.padding(.top, 28)
+            }
+            .padding(.horizontal, AppSpacing.screenPadding)
+            .padding(.bottom, AppSpacing.s(3))
+        }
+        .scrollIndicators(.hidden)
+        .safeAreaInset(edge: .bottom) {
+            StartSessionBar(
+                title: viewModel.isDoneToday ? "Start again" : "Start session",
+                detail: "\(viewModel.rows.count) EX — \(viewModel.estimatedMinutes) MIN",
+                action: onStart
+            )
+            .padding(.horizontal, AppSpacing.screenPadding)
+            .padding(.bottom, AppSpacing.s(1))
         }
     }
 
-    private var startButton: some View {
-        Button("Start", action: onStart)
-            .buttonStyle(AccentButtonStyle())
-            .padding(.bottom, AppSpacing.s(6))
-    }
-}
-
-private struct AccentButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(AppFont.mono(20, weight: .medium))
-            .foregroundStyle(.black)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, AppSpacing.s(2))
-            .background(AppColor.accent)
-            .opacity(configuration.isPressed ? 0.8 : 1)
-    }
-}
-
-struct HeatmapView: View {
-    let matrix: HeatmapMatrix
-    var body: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
-        LazyVGrid(columns: columns, spacing: 4) {
-            ForEach(1...max(matrix.daysInMonth, 1), id: \.self) { day in
-                Rectangle()
-                    .fill(matrix.completedDayNumbers.contains(day) ? AppColor.accent : AppColor.hairline)
-                    .aspectRatio(1, contentMode: .fit)
+    private var statement: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel("This week")
+            Text(viewModel.headline)
+                .font(AppFont.display(42, weight: .bold))
+                .tracking(-1.6)
+                .fixedSize(horizontal: false, vertical: true)
+            if viewModel.streak > 1 {
+                Text("\(viewModel.streak)-DAY STREAK")
+                    .font(AppFont.mono(11, weight: .medium))
+                    .tracking(0.7)
             }
         }
-        .padding(.vertical, AppSpacing.s(2))
+    }
+
+    private var routineSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            InkRule()
+            HStack {
+                SectionLabel("01 — Today")
+                Spacer()
+                SectionLabel("\(viewModel.rows.count) ex / \(viewModel.estimatedMinutes) min")
+            }
+            .padding(.top, 10)
+            Text(viewModel.routineName)
+                .font(AppFont.display(28, weight: .bold))
+                .tracking(-0.8)
+                .padding(.top, 8)
+            VStack(spacing: 0) {
+                ForEach(viewModel.rows) { row in
+                    ExerciseRowView(row: row)
+                }
+            }
+            .padding(.top, 12)
+        }
+    }
+
+    private var emptyContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Masthead(onSettings: onSettings)
+            Spacer()
+            SectionLabel("Get started")
+            Text("No routine yet")
+                .font(AppFont.display(44, weight: .bold))
+                .tracking(-1.8)
+                .padding(.top, 10)
+            Text("Snap your PT handout and Eccentric turns it into a guided routine, read entirely on this iPhone.")
+                .font(AppFont.body(15))
+                .foregroundStyle(AppColor.inkSecondary)
+                .padding(.top, 12)
+            Spacer()
+            Button(action: onSetup) {
+                HStack {
+                    Text("Set up your routine")
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .font(AppFont.display(17, weight: .semibold))
+                .padding(.horizontal, 22)
+            }
+            .buttonStyle(InkGlassButtonStyle())
+            .padding(.bottom, AppSpacing.s(1))
+        }
+        .padding(.horizontal, AppSpacing.screenPadding)
+    }
+}
+
+private struct Masthead: View {
+    let onSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                Text("Eccentric")
+                    .font(AppFont.display(22, weight: .heavy))
+                    .tracking(-0.9)
+                Spacer()
+                Text(Self.dateLabel(for: .now))
+                    .font(AppFont.mono(11, weight: .medium))
+                    .tracking(0.7)
+                    .foregroundStyle(AppColor.inkSecondary)
+                Button(action: onSettings) {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(GlassCircleButtonStyle())
+                .accessibilityLabel("Settings")
+            }
+            InkRule(weight: 2)
+        }
+        .padding(.top, AppSpacing.s(1))
+    }
+
+    static func dateLabel(for date: Date) -> String {
+        let weekday = date.formatted(.dateTime.weekday(.abbreviated))
+        let dayMonth = date.formatted(.dateTime.day().month(.abbreviated))
+        return "\(weekday) — \(dayMonth)".uppercased()
+    }
+}
+
+struct WeekStripView: View {
+    let week: WeekStrip
+    @Environment(\.appAccent) private var accent
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(week.days) { day in
+                VStack(spacing: 6) {
+                    cell(for: day).frame(height: 34)
+                    Text(day.date.formatted(.dateTime.weekday(.narrow)))
+                        .font(AppFont.mono(10, weight: day.isToday ? .medium : .regular))
+                        .foregroundStyle(day.isToday ? AppColor.ink : AppColor.inkSecondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("This week: \(week.completedCount) of 7 days with a session")
+    }
+
+    @ViewBuilder
+    private func cell(for day: WeekStrip.Day) -> some View {
+        if day.isCompleted {
+            Rectangle().fill(AppColor.ink)
+        } else if day.isToday {
+            Rectangle().fill(accent)
+        } else {
+            Rectangle().strokeBorder(AppColor.hairline, lineWidth: 1)
+        }
+    }
+}
+
+private struct ExerciseRowView: View {
+    let row: HomeViewModel.ExerciseRow
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Text(row.number)
+                .font(AppFont.mono(11))
+                .foregroundStyle(AppColor.inkSecondary)
+                .frame(width: 30, alignment: .leading)
+            Text(row.name)
+                .font(AppFont.display(16, weight: .medium))
+            Spacer(minLength: 12)
+            Text(row.prescription)
+                .font(AppFont.mono(13))
+        }
+        .padding(.vertical, 11)
+        .overlay(alignment: .top) { HairlineDivider() }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct StartSessionBar: View {
+    let title: String
+    let detail: String
+    let action: () -> Void
+    @Environment(\.appAccent) private var accent
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(AppColor.onAccent)
+                    .frame(width: 40, height: 40)
+                    .background(accent, in: Circle())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(AppFont.display(16, weight: .semibold))
+                    Text(detail)
+                        .font(AppFont.mono(10))
+                        .tracking(0.6)
+                        .opacity(0.75)
+                }
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 17, weight: .semibold))
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 18)
+        }
+        .buttonStyle(InkGlassButtonStyle())
     }
 }
 

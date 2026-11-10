@@ -1,0 +1,21 @@
+:root {
+  --bg-base: #0A0A0D;
+  --bg-surface: #16161B;
+  --bg-surface-2: #1E1E25;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.16);
+  --text-primary: #F5F5F7;
+  --text-secondary: #9B9BA6;
+  --text-tertiary: #86868F;
+  --accent: #4F63E8;
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent) 40%, transparent);
+  --success: #33E6A6;
+  --warning: #FFB454;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg-base); }
+button { font-family: inherit; cursor: pointer; border: none; background: none; padding: 0; }
+a { text-decoration: none; }

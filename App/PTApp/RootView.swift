@@ -9,7 +9,10 @@ struct RootView: View {
     @State private var route: Route = .home
     @State private var lastStreak: Int = 0
 
+    @AppStorage(AccentChoice.storageKey) private var accentRaw = AccentChoice.signal.rawValue
     @Environment(\.modelContext) private var modelContext
+
+    private var accent: Color { (AccentChoice(rawValue: accentRaw) ?? .signal).color }
 
     var body: some View {
         let routineRepo = RoutineRepository(context: modelContext)
@@ -37,7 +40,8 @@ struct RootView: View {
                             let sessions = (try? sessionRepo.fetchAll()) ?? []
                             lastStreak = StreakCalculator.currentStreak(in: sessions, today: .now)
                             route = .complete
-                        }
+                        },
+                        onEnd: { route = .home }
                     )
                 } else {
                     Text("No routine").onAppear { route = .home }
@@ -47,9 +51,12 @@ struct RootView: View {
             case .settings:
                 SettingsView(
                     viewModel: SettingsViewModel(),
-                    onReplaceRoutine: { route = .setup }
+                    onReplaceRoutine: { route = .setup },
+                    onDone: { route = .home }
                 )
             }
         }
+        .environment(\.appAccent, accent)
+        .tint(AppColor.ink)
     }
 }

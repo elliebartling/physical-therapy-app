@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mend — Guided session, reps</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body { margin: 0; }
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: var(--bg-base); color: var(--text-primary); font-family: var(--font-body); display: flex; flex-direction: column; overflow: hidden; --accent: {{accent}};">
+  <div style="padding: 60px 20px 0; display: flex; align-items: center; justify-content: space-between;">
+    <a href="Main.dc.html" aria-label="End session" style="width: 44px; height: 44px; border-radius: 999px; background: var(--bg-surface-2); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; color: var(--text-primary);">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </a>
+    <div style="font-size: 13px; font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums;">Exercise 4 of 6</div>
+    <div style="width: 44px;"></div>
+  </div>
+
+  <div style="margin: 18px 20px 0; height: 4px; border-radius: 999px; background: var(--bg-surface-2); overflow: hidden;">
+    <div style="width: 62%; height: 100%; border-radius: 999px; background: var(--accent);"></div>
+  </div>
+
+  <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; padding: 0 28px; text-align: center;">
+    <div>
+      <h1 style="margin: 0; font-size: 34px; font-weight: 700; font-family: var(--font-display); letter-spacing: -0.02em;">Bridges</h1>
+      <div style="font-size: 15px; font-weight: 500; color: var(--text-secondary); margin-top: 10px;">Set 1 of 3</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center;">
+      <div style="font-size: 144px; font-weight: 600; font-family: var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -0.04em; line-height: 1;">10</div>
+      <div style="font-size: 13px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.14em; margin-top: 8px;">Reps</div>
+    </div>
+
+    <div style="display: flex; gap: 8px;" role="img" aria-label="Set 1 of 3 in progress">
+      <div style="width: 28px; height: 6px; border-radius: 999px; background: var(--accent);"></div>
+      <div style="width: 28px; height: 6px; border-radius: 999px; background: var(--bg-surface-2);"></div>
+      <div style="width: 28px; height: 6px; border-radius: 999px; background: var(--bg-surface-2);"></div>
+    </div>
+
+    <p style="margin: 0; max-width: 290px; font-size: 14px; line-height: 1.55; color: var(--text-secondary);">Squeeze your glutes at the top, pause for a beat, then lower slowly.</p>
+  </div>
+
+  <div style="padding: 20px 20px 40px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--text-tertiary);">
+      <span>Tap when you finish the set</span>
+    </div>
+    <div style="display: flex; gap: 12px;">
+      <button type="button" style="flex: 1; height: 56px; border-radius: 18px; background: var(--accent); color: #FFFFFF; font-size: 16px; font-weight: 600; font-family: var(--font-display); display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>
+        Done
+      </button>
+      <a href="Main.dc.html" aria-label="Skip to next step" style="width: 56px; height: 56px; border-radius: 18px; background: var(--bg-surface-2); border: 1px solid var(--border-default); color: var(--text-primary); display: flex; align-items: center; justify-content: center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5v14l10-7z" fill="currentColor"></path><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+      </a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#4F63E8","options":["#4F63E8","#7C5CFC","#2DD4BF","#FF7A45"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#4F63E8' };
+  }
+}
+</script>
+</body>
+</html>
