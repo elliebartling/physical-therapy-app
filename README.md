@@ -9,3 +9,8 @@ Open `App/PTApp.xcodeproj` in Xcode 16+ (Swift 6 toolchain). Build the `PTApp` s
 ## Test
 
 `Cmd-U` in Xcode runs all XCTest targets across the `PTAppCore` package.
+
+## Design
+
+Live design canvas and the redesign spec: see `docs/design/README.md` and
+`docs/superpowers/specs/2026-11-10-swiss-glass-redesign-design.md`.
