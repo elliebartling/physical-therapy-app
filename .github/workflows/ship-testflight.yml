@@ -3,7 +3,10 @@ name: Ship TestFlight
 # Ships a signed build of Eccentric to App Store Connect / TestFlight.
 # Manual "Run workflow" only — ship deliberately, one build you choose.
 #
-# Required repo secrets (same values as read-later; they are team-level):
+# Required secrets, stored on the `testflight` environment (not the repo),
+# which only the main branch may deploy from. That keeps the signing key out
+# of reach of a workflow edited on a feature branch. Same values as
+# read-later; they are team-level:
 #   APP_STORE_CONNECT_API_KEY_ID    — Key ID
 #   APP_STORE_CONNECT_ISSUER_ID     — Issuer UUID
 #   APP_STORE_CONNECT_API_KEY_P8    — full .p8 private key contents
@@ -27,6 +30,7 @@ jobs:
   ship:
     runs-on: macos-26
     timeout-minutes: 60
+    environment: testflight
     defaults:
       run:
         shell: bash
