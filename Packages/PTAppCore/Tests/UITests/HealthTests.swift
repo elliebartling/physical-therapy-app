@@ -88,18 +88,24 @@ final class HealthTests: XCTestCase {
         XCTAssertTrue(samples.isEmpty)
     }
 
-    func test_healthSave_runsAfterTheSessionsStoreIsGone() async throws {
+    func test_healthSave_afterEndingEarly_doesNotTouchTheSessionOnceItsStoreIsGone() async throws {
         let store = FakeWorkoutStore()
         var local: ModelContainer? = try ModelContainerFactory.inMemory()
         let repo = SessionRepository(context: try XCTUnwrap(local).mainContext)
         let routine = Routine(name: "T", exercises: [
-            Exercise(name: "Plank", target: .timeSets(seconds: 1, sets: 1), restSeconds: 0, side: .both, order: 0)
+            Exercise(name: "Bridges", target: .repsSets(reps: 10, sets: 1), restSeconds: 0, side: .both, order: 0),
+            Exercise(name: "Clams", target: .repsSets(reps: 10, sets: 1), restSeconds: 0, side: .both, order: 1),
         ])
         let vm = SessionViewModel(routine: routine, sessionRepo: repo, clock: TestClock(),
                                   audio: nil, haptics: nil, health: recorder(store, enabled: true))
-        await vm.run()
-        local = nil   // the store goes away before the Health save gets to run
+        let run = Task { await vm.run() }
+        defer { run.cancel() }
+        try await Task.sleep(nanoseconds: 50_000_000)
+        await vm.completeCurrentSet()   // Bridges done; the session waits on Clams
+        try await Task.sleep(nanoseconds: 50_000_000)
 
+        vm.endEarly()
+        local = nil   // the store goes away before the Health save gets to run
         await vm.healthSave?.value
 
         let samples = await store.samples
