@@ -13,6 +13,8 @@ public final class SessionEngine {
     private var currentExerciseIndex = 0
     private var currentSetIndex = 0
     private var setCompletion: CheckedContinuation<Void, Never>?
+    /// Signals the hold or rest currently being timed to end early.
+    private var skipCurrentWait: AsyncStream<Void>.Continuation?
 
     private var isPaused = false
     private var pauseContinuation: CheckedContinuation<Void, Never>?
@@ -57,9 +59,30 @@ public final class SessionEngine {
         continuation.yield(.resumed)
     }
 
+    /// Moves to the next step: ends a reps set, a timed hold, or a rest early.
     public func skipCurrentSet() async throws {
         setCompletion?.resume()
         setCompletion = nil
+        skipCurrentWait?.yield()
+    }
+
+    /// Sleeps on the clock, returning early if `skipCurrentSet()` is called.
+    /// Still throws if the session's own task is cancelled.
+    private func skippableSleep(seconds: Double) async throws {
+        let (skips, skipSignal) = AsyncStream<Void>.makeStream()
+        skipCurrentWait = skipSignal
+        defer {
+            skipCurrentWait = nil
+            skipSignal.finish()
+        }
+        let clock = self.clock
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await clock.sleep(seconds: seconds) }
+            group.addTask { for await _ in skips { return } }
+            _ = try await group.next()
+            group.cancelAll()
+        }
+        try Task.checkCancellation()
     }
 
     private func awaitIfPaused() async {
@@ -93,7 +116,7 @@ public final class SessionEngine {
                     setCompletion = cont
                 }
             case .timeSets(let seconds, _):
-                try await clock.sleep(seconds: Double(seconds))
+                try await skippableSleep(seconds: Double(seconds))
             }
 
             await Task.yield()
@@ -102,7 +125,7 @@ public final class SessionEngine {
             let isLastSet = setIndex == totalSets - 1
             if !isLastSet, exercise.restSeconds > 0 {
                 continuation.yield(.rest(seconds: exercise.restSeconds))
-                try await clock.sleep(seconds: Double(exercise.restSeconds))
+                try await skippableSleep(seconds: Double(exercise.restSeconds))
             }
         }
     }

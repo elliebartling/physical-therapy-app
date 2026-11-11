@@ -58,4 +58,52 @@ final class SessionEngineControlsTests: XCTestCase {
         collector.cancel()
         XCTAssertEqual(setStartCount, 3)
     }
+
+    func test_skip_endsTimedHoldsAndRestsEarly() async throws {
+        let plank = Exercise(name: "Plank", target: .timeSets(seconds: 30, sets: 2),
+                             restSeconds: 10, side: .both, order: 0)
+        let routine = Routine(name: "T", exercises: [plank])
+        // Holds and rests never end on their own, so only skipping can advance.
+        let engine = SessionEngine(routine: routine, clock: NeverEndingClock())
+
+        var events: [PhaseEvent] = []
+        let collector = Task { for await e in engine.events { events.append(e) } }
+        let run = Task { try await engine.start() }
+        defer { run.cancel(); collector.cancel() }
+
+        try await Task.sleep(nanoseconds: 50_000_000)
+        try await engine.skipCurrentSet()   // ends hold 1
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(events.last, .rest(seconds: 10))
+
+        try await engine.skipCurrentSet()   // ends the rest
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(events.last, .setStarted(setIndex: 1, totalSets: 2, side: .both))
+
+        try await engine.skipCurrentSet()   // ends hold 2, the last set
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(events.last, .sessionCompleted)
+    }
+
+    func test_cancellingDuringAHold_stillStopsTheSession() async throws {
+        let plank = Exercise(name: "Plank", target: .timeSets(seconds: 30, sets: 2),
+                             restSeconds: 10, side: .both, order: 0)
+        let engine = SessionEngine(routine: Routine(name: "T", exercises: [plank]),
+                                   clock: NeverEndingClock())
+        let run = Task { try await engine.start() }
+        try await Task.sleep(nanoseconds: 50_000_000)
+        run.cancel()
+        do {
+            try await run.value
+            XCTFail("a cancelled session must not run to completion")
+        } catch is CancellationError {}
+    }
+}
+
+/// A clock whose sleeps only end by cancellation.
+private struct NeverEndingClock: Clock {
+    var now: Date { .now }
+    func sleep(seconds: Double) async throws {
+        try await Task.sleep(nanoseconds: 3_600_000_000_000)
+    }
 }
