@@ -9,6 +9,7 @@ public struct HomeView: View {
     public var onSettings: () -> Void
     public var onSetup: () -> Void
     public var onEditRoutine: () -> Void
+    @State private var logDay: LogDay? = nil
 
     public init(viewModel: HomeViewModel, onStart: @escaping () -> Void,
                 onSettings: @escaping () -> Void, onSetup: @escaping () -> Void,
@@ -31,6 +32,11 @@ public struct HomeView: View {
         .background(AppColor.surface.ignoresSafeArea())
         .foregroundStyle(AppColor.ink)
         .task { await viewModel.refresh() }
+        .sheet(item: $logDay, onDismiss: { Task { await viewModel.refresh() } }) { day in
+            if let log = viewModel.logSession(on: day.date) {
+                LogSessionView(viewModel: log) { logDay = nil }
+            }
+        }
     }
 
     private var todayContent: some View {
@@ -38,7 +44,9 @@ public struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Masthead(onSettings: onSettings)
                 statement.padding(.top, 24)
-                WeekStripView(week: viewModel.week).padding(.top, 20)
+                WeekStripView(week: viewModel.week) { logDay = LogDay(date: $0) }
+                    .padding(.top, 20)
+                logSessionButton.padding(.top, 4)
                 routineSection.padding(.top, 28)
             }
             .padding(.horizontal, AppSpacing.screenPadding)
@@ -68,6 +76,22 @@ public struct HomeView: View {
                     .font(AppFont.mono(11, weight: .medium))
                     .tracking(0.7)
             }
+        }
+    }
+
+    private var logSessionButton: some View {
+        HStack {
+            Spacer()
+            Button {
+                logDay = LogDay(date: .now)
+            } label: {
+                Label("Log a session", systemImage: "plus.circle")
+                    .font(AppFont.display(15, weight: .medium))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Record a session you did without the app")
         }
     }
 
@@ -169,24 +193,57 @@ private struct Masthead: View {
     }
 }
 
+/// Logging a session for a particular day.
+struct LogDay: Identifiable {
+    let date: Date
+    var id: Date { date }
+}
+
 struct WeekStripView: View {
     let week: WeekStrip
+    /// Called with a day on or before today. Nil makes the strip read-only.
+    var onSelectDay: ((Date) -> Void)? = nil
     @Environment(\.appAccent) private var accent
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(week.days) { day in
-                VStack(spacing: 6) {
-                    cell(for: day).frame(height: 34)
-                    Text(day.date.formatted(.dateTime.weekday(.narrow)))
-                        .font(AppFont.mono(10, weight: day.isToday ? .medium : .regular))
-                        .foregroundStyle(day.isToday ? AppColor.ink : AppColor.inkSecondary)
+                if let onSelectDay, !isFuture(day) {
+                    Button { onSelectDay(day.date) } label: { column(for: day) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(accessibilityLabel(for: day))
+                        .accessibilityHint("Log a session for this day")
+                } else {
+                    column(for: day)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(accessibilityLabel(for: day))
                 }
-                .frame(maxWidth: .infinity)
             }
         }
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("This week: \(week.completedCount) of 7 days with a session")
+    }
+
+    private func column(for day: WeekStrip.Day) -> some View {
+        VStack(spacing: 6) {
+            cell(for: day).frame(height: 34)
+            Text(day.date.formatted(.dateTime.weekday(.narrow)))
+                .font(AppFont.mono(10, weight: day.isToday ? .medium : .regular))
+                .foregroundStyle(day.isToday ? AppColor.ink : AppColor.inkSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+    }
+
+    private func isFuture(_ day: WeekStrip.Day) -> Bool {
+        guard let todayIndex = week.days.firstIndex(where: \.isToday),
+              let index = week.days.firstIndex(of: day) else { return false }
+        return index > todayIndex
+    }
+
+    private func accessibilityLabel(for day: WeekStrip.Day) -> String {
+        let name = day.date.formatted(.dateTime.weekday(.wide).month().day())
+        return "\(name), \(day.isCompleted ? "session done" : "no session")"
     }
 
     @ViewBuilder
