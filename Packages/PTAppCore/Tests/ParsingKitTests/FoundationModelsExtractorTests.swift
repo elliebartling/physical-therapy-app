@@ -49,6 +49,10 @@ final class FoundationModelsExtractorTests: XCTestCase {
     /// "May contain sensitive content"). That's an on-device model behavior, not a
     /// defect in this extractor, so it's treated the same as unavailability rather
     /// than failing the suite.
+    ///
+    /// Likewise skips when the model reports itself available but its assets are
+    /// missing at generation time (ModelManagerError / UnifiedAssetFramework), as
+    /// seen on macOS CI runners: the model can't run there either.
     func test_live_extractsFromSampleLines() async throws {
         let extractor = FoundationModelsExtractor()
         guard extractor.isAvailable else {
@@ -66,6 +70,9 @@ final class FoundationModelsExtractorTests: XCTestCase {
             let description = String(describing: error)
             if description.contains("refusal") || description.contains("sensitive content") {
                 throw XCTSkip("On-device model declined this sample content (safety-guardrail false positive): \(description)")
+            }
+            if description.contains("ModelManagerError") || description.contains("UnifiedAssetFramework") {
+                throw XCTSkip("On-device model assets are missing on this destination: \(description)")
             }
             throw error
         }
