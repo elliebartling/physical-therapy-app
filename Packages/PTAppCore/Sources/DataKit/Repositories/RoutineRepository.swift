@@ -29,6 +29,15 @@ public final class RoutineRepository {
         )
     }
 
+    /// Persists edits made to a saved routine in place, deleting exercises the edit removed.
+    /// The routine keeps its id, so its session history stays attached.
+    public func saveEdits(to routine: Routine, removing removed: [Exercise]) throws {
+        for exercise in removed {
+            context.delete(exercise)
+        }
+        try context.save()
+    }
+
     public func replaceActive(with routine: Routine) throws {
         for old in try fetchAll() where old.isActive {
             old.isActive = false

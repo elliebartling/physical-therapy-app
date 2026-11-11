@@ -5,7 +5,7 @@ import HistoryKit
 import UI
 
 struct RootView: View {
-    enum Route: Hashable { case home, setup, session, complete, settings }
+    enum Route: Hashable { case home, setup, editRoutine, session, complete, settings }
     @State private var route: Route = .home
     @State private var lastStreak: Int = 0
 
@@ -25,8 +25,15 @@ struct RootView: View {
                     viewModel: HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo),
                     onStart: { route = .session },
                     onSettings: { route = .settings },
-                    onSetup: { route = .setup }
+                    onSetup: { route = .setup },
+                    onEditRoutine: { route = .editRoutine }
                 )
+            case .editRoutine:
+                if let routine = try? routineRepo.fetchActive() {
+                    EditRoutineView(routine: routine, repo: routineRepo, onDone: { route = .home })
+                } else {
+                    Text("No routine").onAppear { route = .home }
+                }
             case .setup:
                 SetupView(
                     viewModel: SetupViewModel(routineRepo: routineRepo),
