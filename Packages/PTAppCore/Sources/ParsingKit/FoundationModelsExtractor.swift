@@ -20,6 +20,24 @@ public struct FoundationModelsExtractor: RoutineExtractor {
         return response.content.toParsedRoutine()
     }
 
+    public func extract(fromTranscript text: String) async throws -> ParsedRoutine {
+        let session = LanguageModelSession(instructions: Self.transcriptInstructions)
+        let response = try await session.respond(to: text, generating: GenerableRoutine.self)
+        return response.content.toParsedRoutine()
+    }
+
+    static let transcriptInstructions = """
+    You will be given someone's spoken description of their physical therapy routine, \
+    transcribed by speech recognition. It may be informal, out of order, and include filler \
+    words or corrections such as "actually, make that fifteen". When the speaker corrects \
+    themselves, use the correction. Write spoken numbers as digits ("twelve" → 12, \
+    "half a minute" → 30 seconds).
+    Extract a structured routine. For each exercise capture: name, reps OR durationSec, \
+    sets, restSec, side (one of: both, left, right, alternating), and notes.
+    Default sets to 3, reps to 10, restSec to 30, and side to "both" if not stated. \
+    "Each side" or "each leg" means side "both".
+    """
+
     static let instructions = """
     You will be given OCR lines from a physical therapy exercise handout.
     Extract a structured routine. For each exercise capture: name, reps OR durationSec, \

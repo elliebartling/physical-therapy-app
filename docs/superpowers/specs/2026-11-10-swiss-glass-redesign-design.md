@@ -122,7 +122,7 @@ exercise editor, and schedule editor (times per week, days, sessions per
 day, reminder).
 
 **Import (a sheet):**
-1. **Source:** camera document scanner, photos, PDF, or the share sheet.
+1. **Source:** camera document scanner (multi-page), photos (up to 10, read in the order picked), "Talk it through" (on-device dictation, editable before parsing), PDF, or the share sheet.
 2. **Read on-device.**
 3. **Review:** uncertain values are highlighted with a one-tap fix and "see on sheet".
 4. **What changed:** shown only when the sheet matches an existing routine. It counts added, changed, removed and unchanged exercises, then offers "Replace Phase N" or keep both.

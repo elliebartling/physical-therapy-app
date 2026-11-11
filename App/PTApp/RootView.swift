@@ -30,7 +30,8 @@ struct RootView: View {
             case .setup:
                 SetupView(
                     viewModel: SetupViewModel(routineRepo: routineRepo),
-                    onDone: { route = .home }
+                    onDone: { route = .home },
+                    onCancel: { route = .home }
                 )
             case .session:
                 if let routine = try? routineRepo.fetchActive() {
