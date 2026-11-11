@@ -13,9 +13,11 @@ name: Ship TestFlight
 #   DIST_CERT_P12_BASE64            — Apple Distribution cert, base64 .p12
 #   DIST_CERT_PASSWORD              — the .p12 export password
 #
-# Signing is automatic, so xcodebuild creates the App Store profile itself
-# via the API key. The only entitlement is HealthKit; with
-# -allowProvisioningUpdates Xcode enables it on the App ID when missing.
+# Signing is manual, with the distribution certificate above and an App Store
+# profile that ci/appstore_profile.rb fetches (or creates) through the API key,
+# enabling HealthKit on the App ID first if needed. Automatic signing minted a
+# new Apple Development certificate on every fresh runner until the account
+# hit Apple's limit, so nothing here may need a development certificate.
 
 on:
   workflow_dispatch:
@@ -113,10 +115,23 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN" > /dev/null
           security find-identity -v -p codesigning "$KEYCHAIN"
 
+      - name: Fetch App Store provisioning profile
+        id: profile
+        run: |
+          security find-certificate -c "Apple Distribution" -p "$RUNNER_TEMP/ship.keychain-db" > "$RUNNER_TEMP/dist.pem"
+          ASC_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+          DIST_CERT_PEM_PATH="$RUNNER_TEMP/dist.pem" \
+          BUNDLE_ID=com.ellenbartling.ptroutine \
+          PROFILE_NAME="Mend App Store (CI)" \
+          CAPABILITIES=HEALTHKIT \
+            ruby ci/appstore_profile.rb
+
       - name: Archive (signed)
         run: |
           rm -rf build
           set -o pipefail
+          # Release signing for the app target is manual (App/project.yml);
+          # this names the profile the step above installed.
           xcodebuild archive \
             -project App/PTApp.xcodeproj \
             -scheme PTApp \
@@ -124,22 +139,18 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath build/Mend.xcarchive \
             -derivedDataPath build/DerivedData \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            MEND_APPSTORE_PROFILE="${{ steps.profile.outputs.uuid }}"
 
       - name: Export signed IPA
         run: |
           set -o pipefail
+          OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+          cp ci/ExportOptions.plist "$OPTIONS"
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.ellenbartling.ptroutine ${{ steps.profile.outputs.uuid }}" "$OPTIONS"
           xcodebuild -exportArchive \
             -archivePath build/Mend.xcarchive \
             -exportPath build/export \
-            -exportOptionsPlist ci/ExportOptions.plist \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -exportOptionsPlist "$OPTIONS" \
             | tee /tmp/export.log
           test -f build/export/PTApp.ipa
 
