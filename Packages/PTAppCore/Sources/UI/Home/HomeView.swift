@@ -116,7 +116,7 @@ public struct HomeView: View {
                 .font(AppFont.display(44, weight: .bold))
                 .tracking(-1.8)
                 .padding(.top, 10)
-            Text("Snap your PT handout and Eccentric turns it into a guided routine, read entirely on this iPhone.")
+            Text("Snap your PT handout and Mend turns it into a guided routine, read entirely on this iPhone.")
                 .font(AppFont.body(15))
                 .foregroundStyle(AppColor.inkSecondary)
                 .padding(.top, 12)
@@ -143,7 +143,7 @@ private struct Masthead: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
-                Text("Eccentric")
+                Text("Mend")
                     .font(AppFont.display(22, weight: .heavy))
                     .tracking(-0.9)
                 Spacer()

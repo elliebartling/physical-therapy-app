@@ -33,7 +33,7 @@ public final class BrainDumpViewModel {
     public func startListening() async {
         errorMessage = nil
         guard await dictation.requestAccess() else {
-            errorMessage = "Eccentric needs microphone and speech recognition access to listen. You can turn them on in Settings, or type here instead."
+            errorMessage = "Mend needs microphone and speech recognition access to listen. You can turn them on in Settings, or type here instead."
             return
         }
         let stream: AsyncThrowingStream<String, Error>
