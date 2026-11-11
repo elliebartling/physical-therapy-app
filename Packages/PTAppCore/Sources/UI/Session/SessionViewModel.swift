@@ -19,6 +19,7 @@ public final class SessionViewModel {
     private let sessionRepo: SessionRepository
     private let audio: AudioCueService?
     private let haptics: HapticService?
+    private let health: HealthRecorder?
 
     public private(set) var currentExerciseName = ""
     public private(set) var currentNotes = ""
@@ -39,15 +40,19 @@ public final class SessionViewModel {
     private var currentExercise: Exercise?
     private var exerciseStartedAt: Date = .now
     private var backgroundedAt: Date?
+    /// The Apple Health save started when the session ended, if any.
+    @ObservationIgnored private(set) var healthSave: Task<Void, Never>?
 
     public init(routine: Routine, sessionRepo: SessionRepository,
                 clock: Clock = SystemClock(), audio: AudioCueService? = AudioCueService(),
-                haptics: HapticService? = HapticService()) {
+                haptics: HapticService? = HapticService(),
+                health: HealthRecorder? = HealthRecorder()) {
         self.routine = routine
         self.engine = SessionEngine(routine: routine, clock: clock)
         self.sessionRepo = sessionRepo
         self.audio = audio
         self.haptics = haptics
+        self.health = health
         self.sessionRecord = SessionRecord(routineID: routine.id, startedAt: .now)
     }
 
@@ -68,9 +73,11 @@ public final class SessionViewModel {
         }
         // Ending early or an expired resume window already saved this session as partial.
         guard !isComplete else { return }
-        sessionRecord.completedAt = .now
+        let finishedAt = Date.now
+        sessionRecord.completedAt = finishedAt
         try? sessionRepo.insert(sessionRecord)
         isComplete = true
+        saveToHealth(endedAt: finishedAt, finished: true)
     }
 
     public func pause() { engine.pause() }
@@ -85,6 +92,7 @@ public final class SessionViewModel {
         endedEarly = true
         try? sessionRepo.insert(sessionRecord)
         isComplete = true
+        saveToHealth(endedAt: .now, finished: false)
     }
 
     public func appWillResignActive() {
@@ -100,7 +108,20 @@ public final class SessionViewModel {
             // Finalize as partial — completedAt stays nil.
             try? sessionRepo.insert(sessionRecord)
             isComplete = true
+            saveToHealth(endedAt: bg, finished: false)
         }
+    }
+
+    /// Saves the session to Apple Health: a finished one always, a partial one
+    /// only if at least one exercise was done.
+    ///
+    /// Reads the record now and hands plain values to the save, which runs on
+    /// its own: the view, and with it `run()`, goes away once the session is
+    /// complete, and the record mustn't be touched after its context is gone.
+    private func saveToHealth(endedAt: Date, finished: Bool) {
+        guard let health, finished || !sessionRecord.exerciseRecords.isEmpty else { return }
+        let start = sessionRecord.startedAt
+        healthSave = Task { await health.record(start: start, end: endedAt, wasLoggedLater: false) }
     }
 
     private func handle(_ event: PhaseEvent) {

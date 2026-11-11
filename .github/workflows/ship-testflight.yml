@@ -13,8 +13,9 @@ name: Ship TestFlight
 #   DIST_CERT_P12_BASE64            — Apple Distribution cert, base64 .p12
 #   DIST_CERT_PASSWORD              — the .p12 export password
 #
-# Signing is automatic (no app groups or other entitlements to pin), so
-# xcodebuild creates the App Store profile itself via the API key.
+# Signing is automatic, so xcodebuild creates the App Store profile itself
+# via the API key. The only entitlement is HealthKit; with
+# -allowProvisioningUpdates Xcode enables it on the App ID when missing.
 
 on:
   workflow_dispatch:

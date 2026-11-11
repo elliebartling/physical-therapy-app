@@ -26,6 +26,10 @@
 	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to scan your PT handout for setup.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Mend doesn't read your Health data. It only saves your PT sessions as workouts, if you turn that on.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>If you turn it on in Settings, Mend saves each PT session to Apple Health as a workout.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Lets you describe your exercises out loud instead of typing them.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -31,6 +31,8 @@ public struct SettingsView: View {
                 .onChange(of: viewModel.reminderEnabled) { _, _ in Task { await viewModel.applyReminder() } }
                 .onChange(of: viewModel.reminderTime) { _, _ in Task { await viewModel.applyReminder() } }
 
+                HealthSettingsSection(viewModel: viewModel)
+
                 Section("Sync") {
                     Label("Local only (v1)", systemImage: "iphone")
                 }
@@ -99,5 +101,38 @@ struct AccentPicker: View {
         .buttonStyle(.plain)
         .accessibilityLabel(choice.name)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Optional saving to Apple Health, and what sessions are saved as.
+private struct HealthSettingsSection: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Section {
+            Toggle("Save sessions to Health", isOn: Binding(
+                get: { viewModel.healthEnabled },
+                set: { enabled in Task { await viewModel.setHealthEnabled(enabled) } }
+            ))
+            if viewModel.healthEnabled {
+                Picker("Save as", selection: $viewModel.healthKind) {
+                    ForEach(HealthWorkoutKind.allCases) { kind in
+                        Text(kind.title).tag(kind)
+                    }
+                }
+            }
+        } header: {
+            Text("Apple Health")
+        } footer: {
+            Text(footer)
+        }
+    }
+
+    private var footer: String {
+        if let message = viewModel.healthMessage { return message }
+        if viewModel.healthEnabled {
+            return "Each session you do or log is saved as a workout. Sessions you log later are marked as entered by you."
+        }
+        return "Off. Mend only saves workouts; it never reads your Health data."
     }
 }
