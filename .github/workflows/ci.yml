@@ -43,6 +43,9 @@ jobs:
       - name: Pick a simulator
         run: |
           # Don't hardcode a device name; runner images rotate them.
+          # The build/test steps pin arch=arm64: runners list each simulator
+          # twice (arm64 and x86_64/Rosetta), and when xcodebuild picked the
+          # Rosetta one the test step stalled silently until the job timeout.
           UDID=$(xcrun simctl list devices available -j \
             | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; ds=[x for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]; print(ds[-1]["udid"])')
           echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
@@ -53,17 +56,19 @@ jobs:
           set -o pipefail
           xcodebuild build \
             -project App/PTApp.xcodeproj -scheme PTApp \
-            -destination "platform=iOS Simulator,id=$SIM_UDID" \
-            CODE_SIGNING_ALLOWED=NO | tail -40
+            -destination "platform=iOS Simulator,id=$SIM_UDID,arch=arm64" \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Test PTAppCore (all five bundles)
+        # Tests take ~30s and a cold build ~4 min; anything past this is a stall.
+        timeout-minutes: 12
         run: |
           set -o pipefail
           cd Packages/PTAppCore
           xcodebuild test -scheme PTAppCore-Package \
-            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -destination "platform=iOS Simulator,id=$SIM_UDID,arch=arm64" \
             -resultBundlePath "$RUNNER_TEMP/tests.xcresult" \
-            CODE_SIGNING_ALLOWED=NO | tee "$RUNNER_TEMP/test.log" | tail -60
+            CODE_SIGNING_ALLOWED=NO | tee "$RUNNER_TEMP/test.log"
 
       - name: Assert all five test bundles ran
         run: |
