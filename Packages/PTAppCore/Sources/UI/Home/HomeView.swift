@@ -8,13 +8,16 @@ public struct HomeView: View {
     public var onStart: () -> Void
     public var onSettings: () -> Void
     public var onSetup: () -> Void
+    public var onEditRoutine: () -> Void
 
     public init(viewModel: HomeViewModel, onStart: @escaping () -> Void,
-                onSettings: @escaping () -> Void, onSetup: @escaping () -> Void) {
+                onSettings: @escaping () -> Void, onSetup: @escaping () -> Void,
+                onEditRoutine: @escaping () -> Void = {}) {
         self.viewModel = viewModel
         self.onStart = onStart
         self.onSettings = onSettings
         self.onSetup = onSetup
+        self.onEditRoutine = onEditRoutine
     }
 
     public var body: some View {
@@ -77,10 +80,24 @@ public struct HomeView: View {
                 SectionLabel("\(viewModel.rows.count) ex / \(viewModel.estimatedMinutes) min")
             }
             .padding(.top, 10)
-            Text(viewModel.routineName)
-                .font(AppFont.display(28, weight: .bold))
-                .tracking(-0.8)
-                .padding(.top, 8)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(viewModel.routineName)
+                    .font(AppFont.display(28, weight: .bold))
+                    .tracking(-0.8)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Button(action: onEditRoutine) {
+                    Label("Edit", systemImage: "pencil")
+                        .font(AppFont.display(15, weight: .semibold))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .contentShape(Capsule())
+                        .glassEffect(.regular.interactive(), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Edit routine")
+            }
+            .padding(.top, 8)
             VStack(spacing: 0) {
                 ForEach(viewModel.rows) { row in
                     ExerciseRowView(row: row)

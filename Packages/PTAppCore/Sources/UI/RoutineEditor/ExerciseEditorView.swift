@@ -20,8 +20,9 @@ public struct ExerciseEditorView: View {
     public var body: some View {
         Form {
             Section {
-                TextField("Name", text: $exercise.name)
-                    .font(AppFont.mono(16))
+                TextField("Name", text: $exercise.name, axis: .vertical)
+                    .font(AppFont.display(18, weight: .semibold))
+                    .lineLimit(1...4)
             }
             Section("Target") {
                 Picker("Type", selection: $kind) {
@@ -63,7 +64,7 @@ public struct ExerciseEditorView: View {
                 TextField("Notes", text: $exercise.notes, axis: .vertical).lineLimit(3...8)
             }
         }
-        .navigationTitle(exercise.name)
+        .navigationTitle("Exercise")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

@@ -43,4 +43,24 @@ final class RoutineRepositoryTests: XCTestCase {
         XCTAssertEqual(try repo.fetchAll().count, 2)
         XCTAssertEqual(try repo.fetchAll().filter(\.isActive).count, 1)
     }
+
+    func test_saveEdits_keepsRoutineIdentity_andDeletesRemovedExercises() throws {
+        let (repo, ctx) = makeRepo()
+        let wallSit = Exercise(name: "Wall sit", target: .timeSets(seconds: 30, sets: 3), restSeconds: 20, side: .both, order: 0)
+        let bridges = Exercise(name: "Bridges", target: .repsSets(reps: 10, sets: 3), restSeconds: 30, side: .both, order: 1)
+        let routine = Routine(name: "Knee rehab", exercises: [wallSit, bridges])
+        try repo.save(routine)
+        let originalID = routine.id
+
+        routine.name = "Knee rehab, phase 2"
+        routine.exercises = [bridges]
+        try repo.saveEdits(to: routine, removing: [wallSit])
+
+        let active = try repo.fetchActive()
+        XCTAssertEqual(active?.id, originalID)
+        XCTAssertEqual(active?.name, "Knee rehab, phase 2")
+        XCTAssertEqual(active?.exercises.map(\.name), ["Bridges"])
+        XCTAssertEqual(try repo.fetchAll().count, 1)
+        XCTAssertEqual(try ctx.fetch(FetchDescriptor<Exercise>()).count, 1, "removed exercise is deleted, not orphaned")
+    }
 }

@@ -3,28 +3,32 @@ import ParsingKit
 
 public struct RoutineEditorView: View {
     @Bindable public var viewModel: RoutineEditorViewModel
+    public var title: String?
     public var onSave: () -> Void
+    public var onCancel: (() -> Void)?
 
-    public init(viewModel: RoutineEditorViewModel, onSave: @escaping () -> Void) {
+    public init(viewModel: RoutineEditorViewModel,
+                title: String? = nil,
+                onSave: @escaping () -> Void,
+                onCancel: (() -> Void)? = nil) {
         self.viewModel = viewModel
+        self.title = title
         self.onSave = onSave
+        self.onCancel = onCancel
     }
 
     public var body: some View {
         NavigationStack {
             List {
                 Section {
-                    TextField("Routine name", text: $viewModel.name)
-                        .font(AppFont.mono(18, weight: .medium))
+                    TextField("Routine name", text: $viewModel.name, axis: .vertical)
+                        .font(AppFont.display(20, weight: .semibold))
+                        .lineLimit(1...3)
                 }
                 Section("Exercises") {
                     ForEach($viewModel.exercises, id: \.id) { $ex in
                         NavigationLink(destination: ExerciseEditorView(exercise: $ex)) {
-                            HStack {
-                                Text(ex.name).font(AppFont.mono(16))
-                                Spacer()
-                                Text(summary(for: ex)).font(AppFont.body(13)).foregroundStyle(.secondary)
-                            }
+                            ExerciseSummaryRow(name: ex.name, summary: summary(for: ex))
                         }
                     }
                     .onDelete(perform: viewModel.remove)
@@ -37,15 +41,49 @@ public struct RoutineEditorView: View {
                     }
                 }
             }
+            .navigationTitle(title ?? "")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                EditButton()
-                Button("Save", action: onSave).bold()
+                if let onCancel {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", action: onCancel)
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    EditButton()
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: onSave).bold()
+                }
             }
         }
     }
 
     private func summary(for ex: ParsedRoutine.ParsedExercise) -> String {
-        if let dur = ex.durationSec { return "\(dur)s × \(ex.sets)" }
-        return "\(ex.reps ?? 0) × \(ex.sets)"
+        let base = ex.durationSec.map { "\(ex.sets)×\($0)s" } ?? "\(ex.sets)×\(ex.reps ?? 0)"
+        switch ex.side.lowercased() {
+        case "alternating": return base + " L/R"
+        case "left": return base + " L"
+        case "right": return base + " R"
+        default: return base
+        }
+    }
+}
+
+/// The full exercise name, wrapping as needed, with its prescription underneath.
+private struct ExerciseSummaryRow: View {
+    let name: String
+    let summary: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(name)
+                .font(AppFont.display(16, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(summary)
+                .font(AppFont.mono(12))
+                .foregroundStyle(AppColor.inkSecondary)
+        }
+        .padding(.vertical, 2)
     }
 }
