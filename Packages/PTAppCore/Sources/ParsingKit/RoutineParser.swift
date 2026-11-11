@@ -17,13 +17,34 @@ public struct RoutineParser: Sendable {
     }
 
     public func parse(_ image: UIImage) async throws -> ParsedRoutine {
-        let lines = try await ocr.recognizeLines(in: image)
+        try await parse([image])
+    }
+
+    /// Reads every page in order and extracts one routine from all of them.
+    public func parse(_ images: [UIImage]) async throws -> ParsedRoutine {
+        var lines: [String] = []
+        for image in images {
+            lines += try await ocr.recognizeLines(in: image)
+        }
         guard !lines.isEmpty else { throw ParsingError.noTextFound }
         return try await extract(fromOCRLines: lines)
     }
 
-    /// Walks the chain: skips unavailable extractors, falls through on throw.
+    /// A spoken or typed description of the routine.
+    public func parse(transcript: String) async throws -> ParsedRoutine {
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { throw ParsingError.noTextFound }
+        return try await runChain { try await $0.extract(fromTranscript: text) }
+    }
+
     func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine {
+        try await runChain { try await $0.extract(fromOCRLines: lines) }
+    }
+
+    /// Walks the chain: skips unavailable extractors, falls through on throw.
+    private func runChain(
+        _ attempt: (any RoutineExtractor) async throws -> ParsedRoutine
+    ) async throws -> ParsedRoutine {
         var lastError: Error = ParsingError.allExtractorsFailed
         for extractor in extractors {
             let name = String(describing: type(of: extractor))
@@ -32,7 +53,7 @@ public struct RoutineParser: Sendable {
                 continue
             }
             do {
-                let result = try await extractor.extract(fromOCRLines: lines)
+                let result = try await attempt(extractor)
                 logger.debug("\(name, privacy: .public) succeeded")
                 return result
             } catch {

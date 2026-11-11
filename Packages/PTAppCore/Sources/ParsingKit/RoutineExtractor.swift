@@ -5,10 +5,17 @@ public protocol RoutineExtractor: Sendable {
     /// Defaults to true.
     var isAvailable: Bool { get }
     func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine
+    /// A spoken description ("brain dump"). Defaults to splitting it into
+    /// sentences and treating them like OCR lines.
+    func extract(fromTranscript text: String) async throws -> ParsedRoutine
 }
 
 public extension RoutineExtractor {
     var isAvailable: Bool { true }
+
+    func extract(fromTranscript text: String) async throws -> ParsedRoutine {
+        try await extract(fromOCRLines: TranscriptSegmenter.lines(from: text))
+    }
 }
 
 public enum ParsingError: Error, LocalizedError, Equatable {
@@ -18,7 +25,7 @@ public enum ParsingError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .noTextFound:
-            "No readable text was found in the photo."
+            "No readable text was found."
         case .allExtractorsFailed:
             "Couldn't turn the text into a routine."
         }
