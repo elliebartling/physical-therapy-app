@@ -42,6 +42,12 @@ public final class HomeViewModel {
         }
     }
 
+    /// A log for a session done away from the app, or nil when there's no routine.
+    public func logSession(on date: Date) -> LogSessionViewModel? {
+        guard let routine = try? routineRepo.fetchActive() else { return nil }
+        return LogSessionViewModel(routine: routine, sessionRepo: sessionRepo, date: date, now: today)
+    }
+
     public func refresh() async {
         let routine = try? routineRepo.fetchActive()
         hasRoutine = routine != nil
