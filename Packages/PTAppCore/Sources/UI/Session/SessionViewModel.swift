@@ -77,8 +77,7 @@ public final class SessionViewModel {
         sessionRecord.completedAt = finishedAt
         try? sessionRepo.insert(sessionRecord)
         isComplete = true
-        // Not tied to this task: the view, and with it run(), goes away once complete.
-        healthSave = Task { await recordInHealth(endedAt: finishedAt, finished: true) }
+        saveToHealth(endedAt: finishedAt, finished: true)
     }
 
     public func pause() { engine.pause() }
@@ -93,8 +92,7 @@ public final class SessionViewModel {
         endedEarly = true
         try? sessionRepo.insert(sessionRecord)
         isComplete = true
-        let endedAt = Date.now
-        healthSave = Task { await recordInHealth(endedAt: endedAt, finished: false) }
+        saveToHealth(endedAt: .now, finished: false)
     }
 
     public func appWillResignActive() {
@@ -110,15 +108,20 @@ public final class SessionViewModel {
             // Finalize as partial — completedAt stays nil.
             try? sessionRepo.insert(sessionRecord)
             isComplete = true
-            healthSave = Task { await recordInHealth(endedAt: bg, finished: false) }
+            saveToHealth(endedAt: bg, finished: false)
         }
     }
 
     /// Saves the session to Apple Health: a finished one always, a partial one
     /// only if at least one exercise was done.
-    private func recordInHealth(endedAt: Date, finished: Bool) async {
+    ///
+    /// Reads the record now and hands plain values to the save, which runs on
+    /// its own: the view, and with it `run()`, goes away once the session is
+    /// complete, and the record mustn't be touched after its context is gone.
+    private func saveToHealth(endedAt: Date, finished: Bool) {
         guard let health, finished || !sessionRecord.exerciseRecords.isEmpty else { return }
-        await health.record(start: sessionRecord.startedAt, end: endedAt, wasLoggedLater: false)
+        let start = sessionRecord.startedAt
+        healthSave = Task { await health.record(start: start, end: endedAt, wasLoggedLater: false) }
     }
 
     private func handle(_ event: PhaseEvent) {

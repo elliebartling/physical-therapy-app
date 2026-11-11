@@ -88,6 +88,24 @@ final class HealthTests: XCTestCase {
         XCTAssertTrue(samples.isEmpty)
     }
 
+    func test_healthSave_runsAfterTheSessionsStoreIsGone() async throws {
+        let store = FakeWorkoutStore()
+        var local: ModelContainer? = try ModelContainerFactory.inMemory()
+        let repo = SessionRepository(context: try XCTUnwrap(local).mainContext)
+        let routine = Routine(name: "T", exercises: [
+            Exercise(name: "Plank", target: .timeSets(seconds: 1, sets: 1), restSeconds: 0, side: .both, order: 0)
+        ])
+        let vm = SessionViewModel(routine: routine, sessionRepo: repo, clock: TestClock(),
+                                  audio: nil, haptics: nil, health: recorder(store, enabled: true))
+        await vm.run()
+        local = nil   // the store goes away before the Health save gets to run
+
+        await vm.healthSave?.value
+
+        let samples = await store.samples
+        XCTAssertEqual(samples.count, 1)
+    }
+
     // MARK: Logged sessions
 
     func test_loggedSession_isSavedAsEnteredByThePerson_sizedToWhatWasDone() async throws {

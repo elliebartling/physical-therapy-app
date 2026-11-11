@@ -72,8 +72,7 @@ public final class LogSessionViewModel {
         do {
             try sessionRepo.insert(session)
             errorMessage = nil
-            let done = Set(items.filter(\.isDone).map(\.id))
-            healthSave = Task { await recordInHealth(endingAt: loggedAt, doneExerciseIDs: done) }
+            saveToHealth(endingAt: loggedAt)
             return true
         } catch {
             logger.error("Logging a session failed: \(String(describing: error), privacy: .public)")
@@ -89,11 +88,14 @@ public final class LogSessionViewModel {
 
     /// A logged session has no timing, so Health gets the routine's estimated
     /// length for the exercises that were done, ending at the logged time.
-    private func recordInHealth(endingAt end: Date, doneExerciseIDs done: Set<UUID>) async {
+    /// The estimate is worked out now, so the save never touches the routine's
+    /// models after this view model is gone.
+    private func saveToHealth(endingAt end: Date) {
         guard let health else { return }
+        let done = Set(items.filter(\.isDone).map(\.id))
         let minutes = max(1, SessionEstimate.minutes(for: exercises.filter { done.contains($0.id) }))
         let start = end.addingTimeInterval(-Double(minutes) * 60)
-        await health.record(start: start, end: end, wasLoggedLater: true)
+        healthSave = Task { await health.record(start: start, end: end, wasLoggedLater: true) }
     }
 
     /// Today keeps the current time. An earlier day is logged at midday, so the
