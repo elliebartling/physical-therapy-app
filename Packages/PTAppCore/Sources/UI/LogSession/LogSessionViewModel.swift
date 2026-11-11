@@ -28,13 +28,18 @@ public final class LogSessionViewModel {
     public let latestDate: Date
 
     private let routineID: UUID
+    private let exercises: [Exercise]
     private let sessionRepo: SessionRepository
+    private let health: HealthRecorder?
     private let calendar: Calendar
 
     public init(routine: Routine, sessionRepo: SessionRepository, date: Date,
-                now: Date = .now, calendar: Calendar = .current) {
+                now: Date = .now, calendar: Calendar = .current,
+                health: HealthRecorder? = HealthRecorder()) {
         self.routineID = routine.id
+        self.exercises = routine.orderedExercises
         self.sessionRepo = sessionRepo
+        self.health = health
         self.calendar = calendar
         self.latestDate = now
         self.date = min(date, now)
@@ -67,6 +72,8 @@ public final class LogSessionViewModel {
         do {
             try sessionRepo.insert(session)
             errorMessage = nil
+            let done = Set(items.filter(\.isDone).map(\.id))
+            healthSave = Task { await recordInHealth(endingAt: loggedAt, doneExerciseIDs: done) }
             return true
         } catch {
             logger.error("Logging a session failed: \(String(describing: error), privacy: .public)")
@@ -76,6 +83,18 @@ public final class LogSessionViewModel {
     }
 
     public func dismissError() { errorMessage = nil }
+
+    /// The Apple Health save started by the last `save()`, if any.
+    @ObservationIgnored private(set) var healthSave: Task<Void, Never>?
+
+    /// A logged session has no timing, so Health gets the routine's estimated
+    /// length for the exercises that were done, ending at the logged time.
+    private func recordInHealth(endingAt end: Date, doneExerciseIDs done: Set<UUID>) async {
+        guard let health else { return }
+        let minutes = max(1, SessionEstimate.minutes(for: exercises.filter { done.contains($0.id) }))
+        let start = end.addingTimeInterval(-Double(minutes) * 60)
+        await health.record(start: start, end: end, wasLoggedLater: true)
+    }
 
     /// Today keeps the current time. An earlier day is logged at midday, so the
     /// session can't slip into a neighbouring day.

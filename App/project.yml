@@ -24,6 +24,11 @@ targets:
     platform: iOS
     sources:
       - path: PTApp
+    entitlements:
+      path: PTApp/PTApp.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
     info:
       path: PTApp/Info.plist
       properties:
@@ -39,6 +44,8 @@ targets:
         NSPhotoLibraryUsageDescription: "Used to pick photos of your PT handout."
         NSMicrophoneUsageDescription: "Lets you describe your exercises out loud instead of typing them."
         NSSpeechRecognitionUsageDescription: "Turns what you say into text on this iPhone so Mend can build your routine."
+        NSHealthUpdateUsageDescription: "If you turn it on in Settings, Mend saves each PT session to Apple Health as a workout."
+        NSHealthShareUsageDescription: "Mend doesn't read your Health data. It only saves your PT sessions as workouts, if you turn that on."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIAppFonts:
