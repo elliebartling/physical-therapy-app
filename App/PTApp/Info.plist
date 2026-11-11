@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Eccentric</string>
+	<string>Mend</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconName</key>
@@ -31,7 +31,7 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Used to pick photos of your PT handout.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Turns what you say into text on this iPhone so Eccentric can build your routine.</string>
+	<string>Turns what you say into text on this iPhone so Mend can build your routine.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>JetBrainsMono-Regular.ttf</string>

@@ -27,7 +27,7 @@ targets:
     info:
       path: PTApp/Info.plist
       properties:
-        CFBundleDisplayName: Eccentric
+        CFBundleDisplayName: Mend
         # Read from build settings so CI's build number reaches the app.
         # Without these, XcodeGen writes literal "1.0" / "1".
         CFBundleShortVersionString: $(MARKETING_VERSION)
@@ -38,7 +38,7 @@ targets:
         NSCameraUsageDescription: "Used to scan your PT handout for setup."
         NSPhotoLibraryUsageDescription: "Used to pick photos of your PT handout."
         NSMicrophoneUsageDescription: "Lets you describe your exercises out loud instead of typing them."
-        NSSpeechRecognitionUsageDescription: "Turns what you say into text on this iPhone so Eccentric can build your routine."
+        NSSpeechRecognitionUsageDescription: "Turns what you say into text on this iPhone so Mend can build your routine."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIAppFonts:

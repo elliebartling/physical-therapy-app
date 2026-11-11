@@ -1,4 +1,4 @@
-# Eccentric — Swiss + Glass redesign and v1 UX
+# Mend — Swiss + Glass redesign and v1 UX
 
 Design canvas: https://claude.ai/artifact/KfaaDQ5nDabCfxp5GeTJ9P (see `docs/design/README.md`).
 
