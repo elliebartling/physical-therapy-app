@@ -119,6 +119,23 @@ final class ArtPickerViewTests: XCTestCase {
         }))
     }
 
+    /// ViewInspector cannot run `.task`, so `isSeeded` is out of reach; but the seed lands in the
+    /// picker's initial state, which its body renders. Without the pass-through the picker would
+    /// show only "Finding suggestions…".
+    func test_editorHandsTheImportedSuggestionsToThePicker() throws {
+        var ex = exercise()
+        let imported = ImportedSuggestions(name: ex.name, notes: ex.notes,
+                                           result: MatchResult(choice: .library(slug: "bird-dog"),
+                                                               alternatives: ["dead-bug"]))
+        let v = ExerciseEditorView(exercise: Binding(get: { ex }, set: { ex = $0 }), imported: imported)
+        let link = try v.inspect().find(ViewType.NavigationLink.self, where: {
+            (try? $0.view(ArtPickerView.self, 0)) != nil
+        })
+        let picker = try link.view(ArtPickerView.self, 0)
+        let deadBug = try XCTUnwrap(ExerciseCatalog.bundled.entry(slug: "dead-bug"))
+        XCTAssertNoThrow(try picker.find(text: deadBug.name))
+    }
+
     func test_importedSuggestionsAreServedOnlyWhileNameAndNotesMatch() {
         let imported = ImportedSuggestions(name: "Bird Dog", notes: "slow",
                                            result: MatchResult(choice: .library(slug: "bird-dog"),

@@ -54,13 +54,13 @@ final class ArtStoreTests: XCTestCase {
         XCTAssertEqual(calls, 0)
     }
 
-    func test_concurrentRequestsForTheSameFrameDownloadOnce() async {
+    func test_concurrentRequestsForTheSameFrameDownloadOnce() async throws {
         // The first download is held open, so the other callers must arrive
         // while it is in flight. Without dedup each would start its own.
         let dl = StubFrameDownloader(holdFirstCall: true)
         let store = ArtStore(downloader: dl, directory: tempDir())
         // A slug that left the catalogue would fail every call and the wait below would spin forever.
-        XCTAssertNotNil(ExerciseCatalog.bundled.entry(slug: "dead-bug"))
+        _ = try XCTUnwrap(ExerciseCatalog.bundled.entry(slug: "dead-bug"))
         let results = await withTaskGroup(of: Data?.self) { g -> [Data?] in
             for _ in 0..<8 { g.addTask { await store.frame(slug: "dead-bug", frame: 1) } }
             while await dl.callCount == 0 { await Task.yield() }

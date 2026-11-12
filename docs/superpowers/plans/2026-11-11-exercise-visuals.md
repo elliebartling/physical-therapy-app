@@ -499,7 +499,7 @@ git commit -m "feat(media): add two-stage exercise matcher"
   - `public protocol FrameDownloading: Sendable { func data(slug: String, frame: Int) async throws -> Data }`
   - `public struct CDNFrameDownloader: FrameDownloading` — builds the base URL from Global Constraints.
   - `public actor StubFrameDownloader: FrameDownloading` — `init(data: Data = Data([0x89, 0x50, 0x4E, 0x47]), failing: Bool = false)`, exposing `public var callCount: Int`.
-  - `public actor ArtStore { public init(downloader: FrameDownloading = CDNFrameDownloader(), directory: URL? = nil); public func frame(slug: String, frame: Int) async -> Data?; public func prefetch(slugs: [String]) async }`
+  - `public actor ArtStore { public init(downloader: FrameDownloading = CDNFrameDownloader(), directory: URL? = nil); public func frame(slug: String, frame: Int) async -> Data? }`
 
 `frame` returns `nil` rather than throwing — a missing picture is a normal state, not an error. `directory: nil` means Application Support; tests pass a temporary directory.
 

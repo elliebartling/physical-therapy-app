@@ -243,11 +243,13 @@ Flagged so they can be overridden cheaply.
   suggestions are ready when the review screen appears. (An earlier draft of this
   spec said "batched, one model call for the routine"; that is not what was
   built.) On-device inference is effectively serialised, so N exercises means N
-  sequential inferences, each carrying a prompt measured at ~6.2 KB when
+  sequential inferences, each carrying a prompt measured at ~5.9 KB when
   widened. `matchTimeout` (provisionally 20 s) must be derived from that total,
   not from a single call. Exercises that miss the deadline stay `.unmatched`
   (retryable from the picker). If it proves too slow, the fix is to batch into
   one call or fill matches in after the editor appears, not a bigger timeout.
+  Per-exercise matching also puts the prior spec's two-minute first-session
+  target at risk: import can now block for up to the full `matchTimeout`.
   The import's alternatives are carried into the picker so it need not re-match
   on the review path; after save, the picker re-matches on demand.
 - **An unconfirmed guess reads as a guess** in the review step only; once saved

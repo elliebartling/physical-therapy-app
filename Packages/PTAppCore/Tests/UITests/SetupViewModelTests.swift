@@ -239,14 +239,18 @@ final class SetupViewModelTests: XCTestCase {
     }
 
     func test_parseKeepsTheMatchersAlternativesForThePicker() async throws {
-        let (vm, container) = try makeVM(twoExercises, ranker: StubRanker(slugs: ["bird-dog"]))
-        await vm.parse(transcript: "Bird dog and cat cow")
+        // A weak name makes the matcher offer the whole catalogue to the ranker, so all three
+        // slugs survive its shortlist filter and the last two become alternatives.
+        let (vm, container) = try makeVM(strongAndWeak,
+                                         ranker: StubRanker(slugs: ["bird-dog", "dead-bug", "clamshell"]))
+        await vm.parse(transcript: "Bird dog and a calf stretch")
         let editor = try XCTUnwrap(vm.editorVM)
-        for ex in editor.exercises {
-            let kept = try XCTUnwrap(editor.importedSuggestions[ex.id])
-            XCTAssertEqual(kept.name, ex.name)
-            XCTAssertEqual(kept.result.choice, ex.art)
-        }
+        let weak = try XCTUnwrap(editor.exercises.first { $0.name.hasPrefix("Slant board") })
+        let kept = try XCTUnwrap(editor.importedSuggestions[weak.id])
+        XCTAssertEqual(kept.name, weak.name)
+        XCTAssertEqual(kept.result.choice, weak.art)
+        XCTAssertEqual(kept.result.choice, .library(slug: "bird-dog"))
+        XCTAssertEqual(kept.result.alternatives, ["dead-bug", "clamshell"])
         _ = container
     }
 
