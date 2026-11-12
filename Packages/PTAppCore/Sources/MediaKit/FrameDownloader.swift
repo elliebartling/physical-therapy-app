@@ -1,5 +1,13 @@
 import Foundation
 
+public enum PNGSignature {
+    public static let bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+
+    public static func matches(_ data: Data) -> Bool {
+        data.starts(with: bytes)
+    }
+}
+
 /// Fetches the bytes of one illustration frame. Throws on any failure;
 /// `ArtStore` is what turns failure into "no picture".
 public protocol FrameDownloading: Sendable {
@@ -10,6 +18,7 @@ public enum FrameDownloadError: Error, Sendable, Equatable {
     case badURL
     case badStatus(Int)
     case emptyBody
+    case notPNG
     case stubFailure
 }
 
@@ -36,25 +45,46 @@ public struct CDNFrameDownloader: FrameDownloading {
             throw FrameDownloadError.badStatus(http.statusCode)
         }
         guard !data.isEmpty else { throw FrameDownloadError.emptyBody }
+        // A captive portal or CDN error page can arrive as a 200.
+        guard PNGSignature.matches(data) else { throw FrameDownloadError.notPNG }
         return data
     }
 }
 
 /// A downloader for tests and previews: no network, counts its calls.
+/// With `holdFirstCall`, the first call waits until `release()`.
 public actor StubFrameDownloader: FrameDownloading {
     private let payload: Data
     private let failing: Bool
+    private let holdFirstCall: Bool
+    private var gate: CheckedContinuation<Void, Never>?
+    private var released = false
     public private(set) var callCount = 0
 
-    public init(data: Data = Data([0x89, 0x50, 0x4E, 0x47]), failing: Bool = false) {
+    public init(
+        data: Data = Data(PNGSignature.bytes),
+        failing: Bool = false,
+        holdFirstCall: Bool = false
+    ) {
         self.payload = data
         self.failing = failing
+        self.holdFirstCall = holdFirstCall
+    }
+
+    public func release() {
+        released = true
+        gate?.resume()
+        gate = nil
     }
 
     public func data(slug: String, frame: Int) async throws -> Data {
         callCount += 1
-        // Suspend once so concurrent callers genuinely overlap.
-        await Task.yield()
+        if holdFirstCall, callCount == 1, !released {
+            await withCheckedContinuation { gate = $0 }
+        } else {
+            // Suspend once so concurrent callers genuinely overlap.
+            await Task.yield()
+        }
         if failing { throw FrameDownloadError.stubFailure }
         return payload
     }

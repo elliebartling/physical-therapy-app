@@ -31,7 +31,7 @@ public actor ArtStore {
         let key = "\(slug)/\(frame)"
         let file = directory.appendingPathComponent("\(slug)-\(frame).png")
 
-        if let cached = try? Data(contentsOf: file), !cached.isEmpty {
+        if let cached = try? Data(contentsOf: file), PNGSignature.matches(cached) {
             return cached
         }
         // Concurrent callers await the one download already under way.
@@ -75,14 +75,31 @@ public actor ArtStore {
             logger.info("No art for \(slug, privacy: .public) frame \(frame): \(error.localizedDescription, privacy: .public)")
             return nil
         }
+        guard PNGSignature.matches(data) else {
+            logger.info("Ignoring non-PNG body for \(slug, privacy: .public) frame \(frame)")
+            return nil
+        }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            excludeFromBackup()
             // Atomic, so a second store over this directory never reads a partial file.
             try data.write(to: file, options: .atomic)
         } catch {
             logger.error("Could not cache \(slug, privacy: .public) frame \(frame): \(error.localizedDescription, privacy: .public)")
         }
         return data
+    }
+
+    /// Re-downloadable CDN content has no business in the user's backup.
+    private func excludeFromBackup() {
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var dir = directory
+        do {
+            try dir.setResourceValues(values)
+        } catch {
+            logger.error("Could not exclude art cache from backup: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private static func defaultDirectory() -> URL {

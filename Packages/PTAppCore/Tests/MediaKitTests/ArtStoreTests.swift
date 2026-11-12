@@ -55,13 +55,61 @@ final class ArtStoreTests: XCTestCase {
     }
 
     func test_concurrentRequestsForTheSameFrameDownloadOnce() async {
-        let dl = StubFrameDownloader()
+        // The first download is held open, so the other callers must arrive
+        // while it is in flight. Without dedup each would start its own.
+        let dl = StubFrameDownloader(holdFirstCall: true)
         let store = ArtStore(downloader: dl, directory: tempDir())
-        await withTaskGroup(of: Void.self) { g in
-            for _ in 0..<8 { g.addTask { _ = await store.frame(slug: "dead-bug", frame: 1) } }
+        let results = await withTaskGroup(of: Data?.self) { g -> [Data?] in
+            for _ in 0..<8 { g.addTask { await store.frame(slug: "dead-bug", frame: 1) } }
+            while await dl.callCount == 0 { await Task.yield() }
+            try? await Task.sleep(for: .milliseconds(100))
+            let heldCalls = await dl.callCount
+            XCTAssertEqual(heldCalls, 1, "callers must wait on the in-flight download")
+            await dl.release()
+            var all: [Data?] = []
+            for await r in g { all.append(r) }
+            return all
         }
+        XCTAssertEqual(results.count, 8)
+        XCTAssertTrue(results.allSatisfy { $0 != nil })
         let calls = await dl.callCount
         XCTAssertEqual(calls, 1)
+    }
+
+    func test_framesOutsideTheRangeReturnNilWithoutDownloading() async {
+        let dl = StubFrameDownloader()
+        let store = ArtStore(downloader: dl, directory: tempDir())
+        let low = await store.frame(slug: "bird-dog", frame: 0)
+        let high = await store.frame(slug: "bird-dog", frame: 4)
+        XCTAssertNil(low)
+        XCTAssertNil(high)
+        let calls = await dl.callCount
+        XCTAssertEqual(calls, 0)
+    }
+
+    func test_nonPNGBodyIsNotCachedAndRetriesLater() async {
+        let dir = tempDir()
+        let html = Data("<html>captive portal</html>".utf8)
+        let bad = await ArtStore(downloader: StubFrameDownloader(data: html), directory: dir)
+            .frame(slug: "bird-dog", frame: 1)
+        XCTAssertNil(bad)
+        let good = await ArtStore(downloader: StubFrameDownloader(), directory: dir)
+            .frame(slug: "bird-dog", frame: 1)
+        XCTAssertNotNil(good)
+    }
+
+    func test_cacheDirectoryIsExcludedFromBackup() async throws {
+        let dir = tempDir().appendingPathComponent("art", isDirectory: true)
+        _ = await ArtStore(downloader: StubFrameDownloader(), directory: dir)
+            .frame(slug: "bird-dog", frame: 1)
+        let values = try dir.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        XCTAssertEqual(values.isExcludedFromBackup, true)
+    }
+
+    func test_pngSignatureCheck() {
+        XCTAssertTrue(PNGSignature.matches(Data(PNGSignature.bytes + [0x00])))
+        XCTAssertFalse(PNGSignature.matches(Data([0x89, 0x50, 0x4E, 0x47])))
+        XCTAssertFalse(PNGSignature.matches(Data("<html>".utf8)))
     }
 
     func test_createsMissingCacheDirectory() async {
