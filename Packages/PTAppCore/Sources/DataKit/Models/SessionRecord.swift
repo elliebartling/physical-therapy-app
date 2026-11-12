@@ -8,6 +8,10 @@ public final class SessionRecord {
     public var startedAt: Date
     public var completedAt: Date?
     @Relationship(deleteRule: .cascade) public var exerciseRecords: [ExerciseRecord]
+    /// Pain from 0 to 10 after the session, if recorded.
+    public var painLevel: Int? = nil
+    /// A note for the PT, if any.
+    public var note: String? = nil
 
     public init(
         id: UUID = UUID(),

@@ -23,4 +23,34 @@ final class SessionRecordTests: XCTestCase {
         XCTAssertEqual(fetched?.exerciseRecords.count, 1)
         XCTAssertEqual(fetched?.exerciseRecords.first?.status, .completed)
     }
+
+    @MainActor
+    func test_ratingsPainAndNote_areOptionalAndPersist() throws {
+        let container = try ModelContainerFactory.inMemory()
+        let ctx = container.mainContext
+        let rated = ExerciseRecord(exerciseID: UUID(), status: .completed, startedAt: .now, completedAt: .now)
+        let unrated = ExerciseRecord(exerciseID: UUID(), status: .completed, startedAt: .now, completedAt: .now)
+        let session = SessionRecord(routineID: UUID(), startedAt: .now, completedAt: .now,
+                                    exerciseRecords: [rated, unrated])
+        XCTAssertNil(session.painLevel)
+        XCTAssertNil(session.note)
+        XCTAssertNil(rated.rating)
+
+        rated.rating = .hard
+        session.painLevel = 3
+        session.note = "Left knee clicked on bridges"
+        ctx.insert(session)
+        try ctx.save()
+
+        let fetched = try XCTUnwrap(try ctx.fetch(FetchDescriptor<SessionRecord>()).first)
+        XCTAssertEqual(fetched.painLevel, 3)
+        XCTAssertEqual(fetched.note, "Left knee clicked on bridges")
+        XCTAssertEqual(Set(fetched.exerciseRecords.map(\.rating)), [.hard, nil])
+    }
+
+    func test_unknownStoredRating_readsAsUnrated() {
+        let record = ExerciseRecord(exerciseID: UUID(), status: .completed, startedAt: .now)
+        record.ratingRaw = "fantastic"
+        XCTAssertNil(record.rating)
+    }
 }

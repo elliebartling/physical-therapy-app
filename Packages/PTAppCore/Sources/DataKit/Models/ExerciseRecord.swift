@@ -10,6 +10,8 @@ public final class ExerciseRecord {
     public var statusRaw: String
     public var startedAt: Date
     public var completedAt: Date?
+    /// How it felt, if the person rated it. Optional so older records migrate as-is.
+    public var ratingRaw: String? = nil
 
     public init(
         id: UUID = UUID(),
@@ -23,6 +25,11 @@ public final class ExerciseRecord {
         self.statusRaw = status.rawValue
         self.startedAt = startedAt
         self.completedAt = completedAt
+    }
+
+    public var rating: ExerciseRating? {
+        get { ratingRaw.flatMap(ExerciseRating.init(rawValue:)) }
+        set { ratingRaw = newValue?.rawValue }
     }
 
     public var status: Status {

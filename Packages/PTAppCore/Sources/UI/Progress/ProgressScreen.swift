@@ -197,7 +197,9 @@ private struct ExerciseProgressRow: View {
     private var detail: String {
         let done = row.stats.completed == 1 ? "DONE 1×" : "DONE \(row.stats.completed)×"
         guard let last = row.stats.lastDone else { return "NOT DONE YET" }
-        return "\(done) — LAST \(last.formatted(.dateTime.day().month(.abbreviated)).uppercased())"
+        var parts = [done, "LAST \(last.formatted(.dateTime.day().month(.abbreviated)).uppercased())"]
+        if let rating = row.lastRating { parts.append(rating.title.uppercased()) }
+        return parts.joined(separator: " — ")
     }
 }
 
