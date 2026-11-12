@@ -1,6 +1,9 @@
 import Foundation
 import FoundationModels
 import DataKit
+import os
+
+private let logger = Logger(subsystem: "PTAppCore", category: "parsing")
 
 /// On-device LLM extractor. One of two files in the package allowed to
 /// import FoundationModels (the other is MediaKit/FoundationModelsRanker.swift).
@@ -93,7 +96,13 @@ struct GenerableExercise {
             restSec: max(0, restSec),
             side: validSides.contains(normalizedSide) ? normalizedSide : "both",
             notes: notes,
-            sheetHowTo: sheetHowTo.compactMap { $0.toHowToSection(source: source) }
+            sheetHowTo: sheetHowTo.compactMap { section in
+                let kept = section.toHowToSection(source: source)
+                if kept == nil {
+                    logger.debug("Dropped a how-to section for \(name): body empty or not found in the source text")
+                }
+                return kept
+            }
         )
     }
 }
@@ -123,7 +132,13 @@ struct GenerableHowToSection {
 /// case, whitespace runs, and smart versus straight punctuation, none of which change meaning.
 enum SheetText {
     static func normalised(_ text: String) -> String {
-        let folded = text
+        // NFKC folds PDF ligatures (ﬁ, ﬂ) to plain letters; soft hyphens are invisible.
+        let unified = text.precomposedStringWithCompatibilityMapping
+            .replacingOccurrences(of: "\u{00AD}", with: "")
+        // A hyphen that only marks a line break ("stand-\ning") joins the word back up.
+        let joined = unified.replacingOccurrences(
+            of: "[-\u{2010}\u{2011}][ \\t]*\\r?\\n[ \\t]*", with: "", options: .regularExpression)
+        let folded = joined
             .replacingOccurrences(of: "\u{2018}", with: "'")
             .replacingOccurrences(of: "\u{2019}", with: "'")
             .replacingOccurrences(of: "\u{201C}", with: "\"")

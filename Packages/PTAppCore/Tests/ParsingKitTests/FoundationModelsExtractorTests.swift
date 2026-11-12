@@ -65,6 +65,30 @@ final class FoundationModelsExtractorTests: XCTestCase {
         XCTAssertEqual(ex.sheetHowTo.count, 1)
     }
 
+    func test_sections_matchPDFLigaturesInTheSource() {
+        let source = "Tip \u{2014} You can \u{FB01}nd the \u{FB02}at part of the board."
+        let ex = exercise([
+            GenerableHowToSection(heading: "Tip", body: "You can find the flat part of the board."),
+        ]).toParsedExercise(source: source)
+        XCTAssertEqual(ex.sheetHowTo.map(\.body), ["You can find the flat part of the board."])
+    }
+
+    func test_sections_matchHyphenatedLineBreaksAndSoftHyphens() {
+        let source = "Setup \u{2014} Begin by stand-\ning behind a sl\u{00AD}ant board."
+        let ex = exercise([
+            GenerableHowToSection(heading: "Setup", body: "Begin by standing behind a slant board."),
+        ]).toParsedExercise(source: source)
+        XCTAssertEqual(ex.sheetHowTo.count, 1)
+    }
+
+    func test_sections_aRealHyphenInsideALineIsNotJoined() {
+        let source = "Tip \u{2014} Keep a well-known stance."
+        let ex = exercise([
+            GenerableHowToSection(heading: "Tip", body: "Keep a wellknown stance."),
+        ]).toParsedExercise(source: source)
+        XCTAssertEqual(ex.sheetHowTo, [])
+    }
+
     func test_sections_nearParaphrase_isDropped() {
         let ex = exercise([
             GenerableHowToSection(heading: "Setup", body: "Start by standing in front of a slant board."),
