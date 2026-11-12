@@ -35,4 +35,20 @@ final class SessionRepositoryTests: XCTestCase {
         let range = try repo.fetch(from: yesterday, through: today.addingTimeInterval(86400))
         XCTAssertEqual(range.count, 2)
     }
+
+    func test_delete_removesTheSessionAndItsExerciseRecords() throws {
+        let repo = SessionRepository(context: container.mainContext)
+        let keep = SessionRecord(routineID: UUID(), startedAt: .now, completedAt: .now)
+        let mistake = SessionRecord(routineID: UUID(), startedAt: .now, completedAt: .now, exerciseRecords: [
+            ExerciseRecord(exerciseID: UUID(), status: .completed, startedAt: .now, completedAt: .now)
+        ])
+        try repo.insert(keep)
+        try repo.insert(mistake)
+
+        try repo.delete(mistake)
+
+        XCTAssertEqual(try repo.fetchAll().map(\.id), [keep.id])
+        XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<ExerciseRecord>()).isEmpty,
+                      "exercise records go with their session")
+    }
 }
