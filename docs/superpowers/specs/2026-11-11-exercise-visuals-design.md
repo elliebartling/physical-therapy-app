@@ -197,9 +197,17 @@ Two stages, because 302 candidates will not fit usefully in one prompt:
 1. **Narrow, cheaply and locally.** Normalise the parsed name and score it
    against catalogue names and muscle / equipment terms. Keep a handful.
 2. **Rank, with the on-device model.** Give it the parsed name, the sheet's own
-   notes, and the shortlist. Return a ranked subset with **"none of these" as a
-   first-class option** — constrained generation via `@Generable` so it must
-   choose from the shortlist rather than inventing a slug.
+   notes, and the candidate list. Return a ranked subset with **"none of these"
+   as a first-class option** — constrained generation via `@Generable` so it
+   must choose from the candidates rather than inventing a slug.
+
+**When the shortlist is empty or weak, stage 2 gets the whole catalogue
+instead.** Lexical scoring cannot bridge a clinical name to a common one:
+"Quadruped Opposite Arm/Leg Raise" shares no token with "Bird Dog", and does
+share tokens with "Lying Leg Raise". Narrowing on a weak signal therefore
+discards the right answer before the model ever sees it — and discards it
+precisely for the handout phrasing this feature exists to handle. All 142 names
+are a few KB of prompt, once per routine.
 
 Stage 2 is skipped when the model is unavailable; stage 1's top candidate
 becomes the suggestion *if it clears the floor*, and the rest become the

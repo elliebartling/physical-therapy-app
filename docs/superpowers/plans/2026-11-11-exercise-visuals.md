@@ -299,17 +299,28 @@ func test_exactNameScoresTop() {
 
 func test_handoutPhrasingFindsTheRightFamily() {
     let s = CandidateScorer()
-    // Real handout wording. The right answer need only be in the shortlist —
-    // stage 2 picks. See spec: "rank the few plausible ones".
+    // Real handout wording that shares tokens with the catalogue name.
+    // The right answer need only be in the shortlist — stage 2 picks.
     let cases: [(String, String)] = [
-        ("Quadruped Opposite Arm/Leg Raise", "bird-dog"),
         ("Side-Lying Hip Abduction - Right", "side-lying-hip-abduction"),
         ("Supine Glute Bridge x10", "glute-bridge"),
+        ("Clamshells, 3 sets", "clamshell"),
     ]
     for (input, expected) in cases {
         let slugs = s.candidates(for: input).map(\.entry.slug)
         XCTAssertTrue(slugs.contains(expected), "\(input) → \(slugs)")
     }
+}
+
+func test_clinicalSynonymScoresLowAndMisses() {
+    // "Quadruped Opposite Arm/Leg Raise" is how a handout names a bird dog.
+    // It shares no token with "Bird Dog", and DOES share tokens with
+    // "Lying Leg Raise" — so lexical scoring returns a plausible-looking
+    // shortlist that cannot contain the right answer. Stage 1 must report
+    // this honestly through a low top score; rescuing it is stage 2's job.
+    let c = CandidateScorer().candidates(for: "Quadruped Opposite Arm/Leg Raise")
+    XCTAssertFalse(c.map(\.entry.slug).contains("bird-dog"))
+    XCTAssertLessThan(c.first?.score ?? 0, 0.6)
 }
 
 func test_garbageInputYieldsNoCandidates() {
@@ -368,10 +379,13 @@ git commit -m "feat(media): add stage-1 candidate scoring"
   - `public struct FoundationModelsRanker: CandidateRanker`
   - `public struct StubRanker: CandidateRanker` — `init(slugs: [String], isAvailable: Bool = true)`.
   - `public struct ThrowingRanker: CandidateRanker` — `rank` always throws, `isAvailable` is `true`. Used here and in Task 8.
+  - `public actor RecordingRanker: CandidateRanker` — `init(slugs: [String])`, returns them, and exposes `public var lastCandidateCount: Int` (the size of the candidate list it was last handed) so widening can be asserted.
   - `public struct MatchResult: Sendable, Equatable { public let choice: ArtChoice; public let alternatives: [String] }`
-  - `public struct ExerciseMatcher: Sendable { public init(scorer: CandidateScorer = .init(), ranker: CandidateRanker = FoundationModelsRanker(), floor: Double = 0.45); public func match(name: String, notes: String) async -> MatchResult }`
+  - `public struct ExerciseMatcher: Sendable { public init(scorer: CandidateScorer = .init(), catalog: ExerciseCatalog = .bundled, ranker: CandidateRanker = FoundationModelsRanker(), floor: Double = 0.45, wideningThreshold: Double = 0.6); public func match(name: String, notes: String) async -> MatchResult }`
 
 `match` never throws: a ranker failure falls back to stage 1, mirroring how `RoutineParser.extract` falls through its extractor chain.
+
+**Widening.** Lexical scoring cannot bridge a clinical synonym to a common name — "Quadruped Opposite Arm/Leg Raise" shares no token with "Bird Dog", and shares several with "Lying Leg Raise". So when the shortlist is empty, or its top score is below `wideningThreshold`, stage 2 is given **the whole catalogue** (all 142 entries, as `ScoredCandidate`s with score 0) instead of the shortlist. 142 names is a few KB of prompt, once per routine, and bridging those synonyms is the main thing the on-device model is here for. Widening never happens when the ranker is unavailable — that path is stage 1 plus the floor, as before.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -402,11 +416,37 @@ func test_floorAppliesOnStageOneOnlyPath() async {
     XCTAssertEqual(r.choice, .none)
 }
 
-func test_noCandidatesSkipsRankerEntirely() async {
-    let m = ExerciseMatcher(ranker: StubRanker(slugs: ["bird-dog"]))
+func test_clinicalSynonymIsRescuedByWidening() async {
+    // Stage 1 cannot reach bird-dog from this name (see CandidateScorerTests).
+    // Widening hands the whole catalogue to the ranker, which can.
+    let ranker = RecordingRanker(slugs: ["bird-dog"])
+    let m = ExerciseMatcher(ranker: ranker)
+    let r = await m.match(name: "Quadruped Opposite Arm/Leg Raise", notes: "")
+    XCTAssertEqual(r.choice, .library(slug: "bird-dog"))
+    XCTAssertEqual(await ranker.lastCandidateCount, 142)
+}
+
+func test_strongShortlistIsNotWidened() async {
+    let ranker = RecordingRanker(slugs: ["bird-dog"])
+    let m = ExerciseMatcher(ranker: ranker)
+    _ = await m.match(name: "Bird Dog", notes: "")
+    let count = await ranker.lastCandidateCount
+    XCTAssertLessThanOrEqual(count, 8)
+}
+
+func test_garbageNameEndsAsNoPictureWhenTheRankerDeclines() async {
+    // Widening also fires here; the ranker answering "none of these" is what
+    // makes it no picture, which is the honest outcome for page furniture.
+    let m = ExerciseMatcher(ranker: StubRanker(slugs: []))
     let r = await m.match(name: "Page 2 of 3", notes: "")
-    XCTAssertEqual(r.choice, .none)
+    XCTAssertEqual(r.choice, ArtChoice.none)
     XCTAssertTrue(r.alternatives.isEmpty)
+}
+
+func test_noWideningWhenTheRankerIsUnavailable() async {
+    let m = ExerciseMatcher(ranker: StubRanker(slugs: [], isAvailable: false))
+    let r = await m.match(name: "Quadruped Opposite Arm/Leg Raise", notes: "")
+    XCTAssertEqual(r.choice, ArtChoice.none)
 }
 
 func test_rankerThrowingFallsBackToStageOne() async {
