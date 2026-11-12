@@ -21,11 +21,15 @@ public extension RoutineExtractor {
 public enum ParsingError: Error, LocalizedError, Equatable {
     case noTextFound
     case allExtractorsFailed
+    /// A picked file that isn't a supported type, or can't be opened.
+    case unreadableFile
 
     public var errorDescription: String? {
         switch self {
         case .noTextFound:
             "No readable text was found."
+        case .unreadableFile:
+            "That file couldn't be opened."
         case .allExtractorsFailed:
             "Couldn't turn the text into a routine."
         }

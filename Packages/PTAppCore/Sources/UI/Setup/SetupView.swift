@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import PhotosUI
 import DataKit
+import ParsingKit
 
 public struct SetupView: View {
     @Bindable public var viewModel: SetupViewModel
@@ -10,6 +11,7 @@ public struct SetupView: View {
 
     @State private var showScanner = false
     @State private var showBrainDump = false
+    @State private var showFileImporter = false
     @State private var photoItems: [PhotosPickerItem] = []
 
     public init(viewModel: SetupViewModel, onDone: @escaping () -> Void, onCancel: @escaping () -> Void = {}) {
@@ -42,6 +44,16 @@ public struct SetupView: View {
                 },
                 onCancel: { showBrainDump = false }
             )
+        }
+        .fileImporter(isPresented: $showFileImporter,
+                      allowedContentTypes: RoutineDocument.supportedTypes,
+                      allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls):
+                Task { await viewModel.parse(fileURLs: urls) }
+            case .failure(let error):
+                viewModel.fileImportFailed(error)
+            }
         }
         .onChange(of: photoItems) { _, items in
             guard !items.isEmpty else { return }
@@ -110,7 +122,7 @@ public struct SetupView: View {
                 .font(AppFont.display(40, weight: .bold))
                 .tracking(-1.6)
                 .padding(.top, 22)
-            Text("Scan the pages, pick screenshots, or just talk it through. Everything is read on this iPhone.")
+            Text("Scan the pages, pick screenshots or a file, or just talk it through. Everything is read on this iPhone.")
                 .font(AppFont.body(15))
                 .foregroundStyle(AppColor.inkSecondary)
                 .padding(.top, 10)
@@ -150,8 +162,14 @@ public struct SetupView: View {
                           systemImage: "photo.on.rectangle")
             }
             .buttonStyle(.plain)
+            Button { showFileImporter = true } label: {
+                SourceRow(number: 2 + offset, title: "Choose a file",
+                          detail: "PDF, image or text — from Files",
+                          systemImage: "doc")
+            }
+            .buttonStyle(.plain)
             Button { showBrainDump = true } label: {
-                SourceRow(number: 2 + offset, title: "Talk it through",
+                SourceRow(number: 3 + offset, title: "Talk it through",
                           detail: "Describe your exercises out loud",
                           systemImage: "waveform")
             }
