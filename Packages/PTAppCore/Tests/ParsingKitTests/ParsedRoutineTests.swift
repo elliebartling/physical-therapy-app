@@ -49,6 +49,22 @@ final class ParsedRoutineTests: XCTestCase {
         XCTAssertEqual(routine.orderedExercises.first?.sheetHowTo, [section])
     }
 
+    func test_applyToAnExistingExercise_writesAChangedSheetHowTo() {
+        let old = HowToSection(heading: "Tip", body: "Old.")
+        let new = HowToSection(heading: "Setup", body: "New.")
+        let routine = ParsedRoutine(name: "R", exercises: [
+            .init(name: "X", reps: 1, sets: 1, durationSec: nil, restSec: 0, side: "both",
+                  notes: "", sheetHowTo: [old]),
+        ]).toRoutine()
+        var draft = ParsedRoutine(routine: routine)
+        draft.exercises[0].sheetHowTo = [new]
+        draft.apply(to: routine)
+        XCTAssertEqual(routine.orderedExercises.first?.sheetHowTo, [new])
+        draft.exercises[0].sheetHowTo = []
+        draft.apply(to: routine)
+        XCTAssertEqual(routine.orderedExercises.first?.sheetHowTo, [])
+    }
+
     func test_applyCreatingANewExerciseCarriesSheetHowTo() {
         let section = HowToSection(heading: "Setup", body: "Stand.")
         let routine = Routine(name: "R", exercises: [])

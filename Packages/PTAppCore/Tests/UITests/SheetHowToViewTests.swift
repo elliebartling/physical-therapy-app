@@ -24,6 +24,13 @@ final class SheetHowToViewTests: XCTestCase {
 
     func test_noSections_rendersNothing() throws {
         let sut = SheetHowToView(sections: [])
-        XCTAssertThrowsError(try sut.inspect().find(ViewType.Text.self))
+        // A throw from inspect() fails the test; only "inspected fine, found no Text" passes.
+        XCTAssertEqual(try sut.inspect().findAll(ViewType.Text.self).count, 0)
+    }
+
+    func test_emptyHeading_omitsTheHeadingAndShowsTheBody() throws {
+        let sut = SheetHowToView(sections: [HowToSection(heading: "", body: "Heels down.")])
+        let texts = try sut.inspect().findAll(ViewType.Text.self).map { try $0.string() }
+        XCTAssertEqual(texts, ["Heels down."])
     }
 }

@@ -13,18 +13,19 @@ public struct FoundationModelsExtractor: RoutineExtractor {
     }
 
     public func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine {
+        let source = lines.joined(separator: "\n")
         let session = LanguageModelSession(instructions: Self.instructions)
         let response = try await session.respond(
-            to: lines.joined(separator: "\n"),
+            to: source,
             generating: GenerableRoutine.self
         )
-        return response.content.toParsedRoutine()
+        return response.content.toParsedRoutine(source: source)
     }
 
     public func extract(fromTranscript text: String) async throws -> ParsedRoutine {
         let session = LanguageModelSession(instructions: Self.transcriptInstructions)
         let response = try await session.respond(to: text, generating: GenerableRoutine.self)
-        return response.content.toParsedRoutine()
+        return response.content.toParsedRoutine(source: text)
     }
 
     static let transcriptInstructions = """
@@ -57,8 +58,8 @@ struct GenerableRoutine {
     var name: String
     var exercises: [GenerableExercise]
 
-    func toParsedRoutine() -> ParsedRoutine {
-        ParsedRoutine(name: name, exercises: exercises.map { $0.toParsedExercise() })
+    func toParsedRoutine(source: String) -> ParsedRoutine {
+        ParsedRoutine(name: name, exercises: exercises.map { $0.toParsedExercise(source: source) })
     }
 }
 
@@ -76,12 +77,12 @@ struct GenerableExercise {
     var restSec: Int
     @Guide(description: "Exactly one of: both, left, right, alternating")
     var side: String
-    @Guide(description: "Extra instructions; empty string when none")
+    @Guide(description: "Incidental remarks that are NOT part of a labelled instruction block (those belong in sheetHowTo); empty string when none")
     var notes: String
     @Guide(description: "The handout's own labelled instruction blocks for this exercise (for example Setup, Movement, Tip, or whatever headings the sheet uses), in the order printed, each with its heading copied verbatim and its text copied from the sheet. Empty when the sheet has no instruction text for this exercise. Never write or paraphrase instructions that are not on the sheet.")
     var sheetHowTo: [GenerableHowToSection]
 
-    func toParsedExercise() -> ParsedRoutine.ParsedExercise {
+    func toParsedExercise(source: String) -> ParsedRoutine.ParsedExercise {
         let validSides = ["both", "left", "right", "alternating"]
         let normalizedSide = side.lowercased().trimmingCharacters(in: .whitespaces)
         return .init(
@@ -92,7 +93,7 @@ struct GenerableExercise {
             restSec: max(0, restSec),
             side: validSides.contains(normalizedSide) ? normalizedSide : "both",
             notes: notes,
-            sheetHowTo: sheetHowTo.compactMap { $0.toHowToSection() }
+            sheetHowTo: sheetHowTo.compactMap { $0.toHowToSection(source: source) }
         )
     }
 }
@@ -104,10 +105,32 @@ struct GenerableHowToSection {
     @Guide(description: "The block's text as printed on the sheet")
     var body: String
 
-    func toHowToSection() -> HowToSection? {
+    /// Keeps the block only if its text really appears in `source`. The model is asked to copy,
+    /// but a paraphrase is the phone writing rehab guidance, so this is enforced here, not by
+    /// the prompt. A heading that is not on the sheet is blanked rather than shown.
+    func toHowToSection(source: String) -> HowToSection? {
         let heading = heading.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty else { return nil }
-        return HowToSection(heading: heading, body: body)
+        let haystack = SheetText.normalised(source)
+        let needle = SheetText.normalised(body)
+        guard !needle.isEmpty, haystack.contains(needle) else { return nil }
+        let headingIsOnSheet = haystack.contains(SheetText.normalised(heading))
+        return HowToSection(heading: headingIsOnSheet ? heading : "", body: body)
+    }
+}
+
+/// Comparison form for "is this text on the sheet": OCR, PDF text and the model disagree on
+/// case, whitespace runs, and smart versus straight punctuation, none of which change meaning.
+enum SheetText {
+    static func normalised(_ text: String) -> String {
+        let folded = text
+            .replacingOccurrences(of: "\u{2018}", with: "'")
+            .replacingOccurrences(of: "\u{2019}", with: "'")
+            .replacingOccurrences(of: "\u{201C}", with: "\"")
+            .replacingOccurrences(of: "\u{201D}", with: "\"")
+            .replacingOccurrences(of: "\u{2013}", with: "-")
+            .replacingOccurrences(of: "\u{2014}", with: "-")
+            .lowercased()
+        return folded.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 }
