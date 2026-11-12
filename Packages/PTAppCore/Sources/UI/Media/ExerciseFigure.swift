@@ -14,20 +14,24 @@ public extension EnvironmentValues {
 /// With no picture (unmatched, none, unknown slug, not downloaded, offline)
 /// it is an empty square of the same size: no placeholder, no spinner, so the
 /// layout does not move if a picture arrives later.
+///
+/// The store comes from `\.artStore`; pass `store:` only in tests and previews.
 public struct ExerciseFigure: View {
     private let art: ArtChoice
     private let frame: Int
-    private let store: ArtStore
+    private let explicitStore: ArtStore?
 
+    @Environment(\.artStore) private var environmentStore
     @State private var image: UIImage?
+    @State private var loadedKey: LoadKey?
 
-    public init(art: ArtChoice, frame: Int = 1, store: ArtStore) {
+    public init(art: ArtChoice, frame: Int = 1, store: ArtStore? = nil) {
         self.art = art
         self.frame = frame
-        self.store = store
+        self.explicitStore = store
     }
 
-    private struct LoadKey: Equatable {
+    struct LoadKey: Equatable {
         let slug: String?
         let frame: Int
     }
@@ -37,13 +41,46 @@ public struct ExerciseFigure: View {
         return LoadKey(slug: nil, frame: frame)
     }
 
+    static func resolveStore(explicit: ArtStore?, environment: ArtStore) -> ArtStore {
+        explicit ?? environment
+    }
+
+    static func loadImage(slug: String?, frame: Int, store: ArtStore) async -> UIImage? {
+        guard let slug, let data = await store.frame(slug: slug, frame: frame) else { return nil }
+        return UIImage(data: data)
+    }
+
     public var body: some View {
-        // The square is always present; the picture is only drawn over it.
+        ExerciseFigureCanvas(image: image)
+            .task(id: loadKey) { await load() }
+    }
+
+    private func load() async {
+        let key = loadKey
+        // Clear only when the key really changed, so a row that scrolls back
+        // into view keeps its figure instead of blinking.
+        if loadedKey != key {
+            image = nil
+            loadedKey = key
+        }
+        guard image == nil else { return }
+        let store = Self.resolveStore(explicit: explicitStore, environment: environmentStore)
+        let loaded = await Self.loadImage(slug: key.slug, frame: key.frame, store: store)
+        guard !Task.isCancelled else { return }
+        image = loaded
+    }
+}
+
+/// The drawing half of `ExerciseFigure`: a pure function of its image.
+/// The square is always present; the picture is only drawn over it.
+struct ExerciseFigureCanvas: View {
+    let image: UIImage?
+
+    var body: some View {
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .overlay { picture }
             .accessibilityHidden(true)
-            .task(id: loadKey) { await load() }
     }
 
     @ViewBuilder private var picture: some View {
@@ -52,14 +89,7 @@ public struct ExerciseFigure: View {
                 .resizable()
                 .scaledToFit()
                 .foregroundStyle(AppColor.ink)
+                .accessibilityHidden(true)
         }
-    }
-
-    private func load() async {
-        image = nil
-        guard let slug = loadKey.slug,
-              let data = await store.frame(slug: slug, frame: frame),
-              !Task.isCancelled else { return }
-        image = UIImage(data: data)
     }
 }

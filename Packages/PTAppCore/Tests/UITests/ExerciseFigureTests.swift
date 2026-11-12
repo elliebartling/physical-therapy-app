@@ -7,29 +7,65 @@ import MediaKit
 
 @MainActor
 final class ExerciseFigureTests: XCTestCase {
-    func test_noPictureStatesRenderNothingVisible() throws {
-        let store = ArtStore(downloader: StubFrameDownloader(failing: true), directory: tempDir())
+    /// A real, decodable 1x1 PNG.
+    private static let onePixelPNG = Data(base64Encoded:
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==") ?? Data()
+
+    private func pixel() throws -> UIImage {
+        try XCTUnwrap(UIImage(data: Self.onePixelPNG), "fixture PNG must decode")
+    }
+
+    // MARK: canvas
+
+    func test_canvasWithAnImage_rendersATemplateImage() throws {
+        let sut = ExerciseFigureCanvas(image: try pixel())
+        let image = try sut.inspect().find(ViewType.Image.self)
+        XCTAssertEqual(try image.actualImage().uiImage().renderingMode, .alwaysTemplate)
+    }
+
+    func test_canvasWithAnImage_isHiddenFromVoiceOver() throws {
+        let sut = ExerciseFigureCanvas(image: try pixel())
+        XCTAssertTrue(try sut.inspect().find(ViewType.Image.self).accessibilityHidden())
+    }
+
+    func test_canvasWithoutAnImage_rendersNoImageAndIsHidden() throws {
+        let sut = ExerciseFigureCanvas(image: nil)
+        XCTAssertThrowsError(try sut.inspect().find(ViewType.Image.self))
+        XCTAssertTrue(try sut.inspect().find(ViewType.Color.self).accessibilityHidden())
+    }
+
+    // MARK: first render
+
+    func test_firstRender_showsNoImageForEveryArtChoice() throws {
+        let store = ArtStore(downloader: StubFrameDownloader(), directory: tempDir())
         for art in [ArtChoice.unmatched, .none, .library(slug: "bench-press")] {
-            let v = ExerciseFigure(art: art, store: store)
-            XCTAssertThrowsError(try v.inspect().find(ViewType.Image.self), "\(art)")
+            let sut = ExerciseFigure(art: art, store: store)
+            XCTAssertThrowsError(try sut.inspect().find(ViewType.Image.self), "\(art)")
         }
     }
 
-    func test_figureIsHiddenFromVoiceOver() throws {
-        let v = ExerciseFigure(art: .library(slug: "bird-dog"),
-                               store: ArtStore(downloader: StubFrameDownloader(), directory: tempDir()))
-        XCTAssertTrue(try v.inspect().find(ViewType.Color.self).accessibilityHidden())
+    // MARK: loading
+
+    func test_loadImage_decodesAFrameFromTheStore() async throws {
+        let store = ArtStore(downloader: StubFrameDownloader(data: Self.onePixelPNG), directory: tempDir())
+        let image = await ExerciseFigure.loadImage(slug: "bird-dog", frame: 1, store: store)
+        XCTAssertNotNil(image)
     }
 
-    func test_hiddenFromVoiceOverEvenWithNoPicture() throws {
+    func test_loadImage_isNilWhenOfflineOrUnmatched() async {
         let store = ArtStore(downloader: StubFrameDownloader(failing: true), directory: tempDir())
-        for art in [ArtChoice.unmatched, .none] {
-            XCTAssertTrue(try ExerciseFigure(art: art, store: store).inspect().find(ViewType.Color.self).accessibilityHidden(), "\(art)")
-        }
+        let offline = await ExerciseFigure.loadImage(slug: "bench-press", frame: 1, store: store)
+        let unmatched = await ExerciseFigure.loadImage(slug: nil, frame: 1, store: store)
+        XCTAssertNil(offline)
+        XCTAssertNil(unmatched)
     }
 
-    func test_environmentProvidesADefaultStore() {
-        // Reading the default must not crash or require setup.
-        _ = EnvironmentValues().artStore
+    // MARK: environment
+
+    func test_storeFallsBackToTheEnvironmentWhenNoneIsPassed() {
+        let env = ArtStore(downloader: StubFrameDownloader(), directory: tempDir())
+        let explicit = ArtStore(downloader: StubFrameDownloader(), directory: tempDir())
+        XCTAssertTrue(ExerciseFigure.resolveStore(explicit: nil, environment: env) === env)
+        XCTAssertTrue(ExerciseFigure.resolveStore(explicit: explicit, environment: env) === explicit)
     }
 }
