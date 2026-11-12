@@ -22,12 +22,11 @@ public struct RoutineParser: Sendable {
 
     /// Reads every page in order and extracts one routine from all of them.
     public func parse(_ images: [UIImage]) async throws -> ParsedRoutine {
-        var lines: [String] = []
+        var pages: [[String]] = []
         for image in images {
-            lines += try await ocr.recognizeLines(in: image)
+            pages.append(try await ocr.recognizeLines(in: image))
         }
-        guard !lines.isEmpty else { throw ParsingError.noTextFound }
-        return try await extract(fromOCRLines: lines)
+        return try await extract(fromPages: pages)
     }
 
     /// A spoken or typed description of the routine.
@@ -39,6 +38,13 @@ public struct RoutineParser: Sendable {
 
     func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine {
         try await runChain { try await $0.extract(fromOCRLines: lines) }
+    }
+
+    /// Pages are kept apart so an extractor with a small input limit can read them in turn.
+    func extract(fromPages pages: [[String]]) async throws -> ParsedRoutine {
+        let pages = pages.filter { !$0.isEmpty }
+        guard !pages.isEmpty else { throw ParsingError.noTextFound }
+        return try await runChain { try await $0.extract(fromPages: pages) }
     }
 
     /// Walks the chain: skips unavailable extractors, falls through on throw.

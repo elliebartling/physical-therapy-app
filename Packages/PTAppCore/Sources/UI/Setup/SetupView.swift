@@ -73,7 +73,8 @@ public struct SetupView: View {
             }
         case .editing:
             if let editorVM = viewModel.editorVM {
-                RoutineEditorView(viewModel: editorVM, onSave: viewModel.save)
+                RoutineEditorView(viewModel: editorVM, onSave: viewModel.save,
+                                  onCancel: viewModel.startOver)
             } else {
                 Text("Editor unavailable")
             }

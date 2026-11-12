@@ -52,36 +52,36 @@ extension RoutineParser {
 
     /// Documents, in order, read as one routine.
     public func parse(documents: [RoutineDocument]) async throws -> ParsedRoutine {
-        var lines: [String] = []
+        var pages: [[String]] = []
         for document in documents {
-            lines += try await self.lines(in: document)
+            pages += try await self.pages(in: document)
         }
-        guard !lines.isEmpty else { throw ParsingError.noTextFound }
-        return try await extract(fromOCRLines: lines)
+        return try await extract(fromPages: pages)
     }
 
-    func lines(in document: RoutineDocument) async throws -> [String] {
+    /// A document's text, one array of lines per page.
+    func pages(in document: RoutineDocument) async throws -> [[String]] {
         switch document {
         case .text(let text):
-            return Self.nonEmptyLines(in: text)
+            return [Self.nonEmptyLines(in: text)]
         case .image(let data):
             guard let image = UIImage(data: data) else { throw ParsingError.unreadableFile }
-            return try await ocr.recognizeLines(in: image)
+            return [try await ocr.recognizeLines(in: image)]
         case .pdf(let data):
             guard let pdf = PDFDocument(data: data) else { throw ParsingError.unreadableFile }
-            var lines: [String] = []
+            var pages: [[String]] = []
             for index in 0..<min(pdf.pageCount, Self.maxPDFPages) {
                 guard let page = pdf.page(at: index) else { continue }
                 // Use the page's own text when it has some; scanned pages have
                 // none, so read those like a photo.
                 let text = Self.nonEmptyLines(in: page.string ?? "")
                 if !text.isEmpty {
-                    lines += text
+                    pages.append(text)
                 } else {
-                    lines += try await ocr.recognizeLines(in: Self.render(page))
+                    pages.append(try await ocr.recognizeLines(in: Self.render(page)))
                 }
             }
-            return lines
+            return pages
         }
     }
 
