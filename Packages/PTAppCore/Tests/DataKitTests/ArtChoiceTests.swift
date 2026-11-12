@@ -31,4 +31,17 @@ final class ArtChoiceTests: XCTestCase {
         XCTAssertEqual(String(data: data, encoding: .utf8), "\"library:bird-dog\"")
         XCTAssertEqual(try JSONDecoder().decode(ArtChoice.self, from: data), .library(slug: "bird-dog"))
     }
+
+    func test_exerciseArtFallsBackToUnmatchedForNilOrUnrecognisedRaw() {
+        let e = Exercise(name: "Bird Dog", target: .repsSets(reps: 10, sets: 3), restSeconds: 30, side: .both)
+        e.artRaw = nil
+        XCTAssertEqual(e.art, .unmatched)
+        e.artRaw = "wat"
+        XCTAssertEqual(e.art, .unmatched)
+    }
+
+    func test_decodingUnknownRawStringThrows() {
+        let data = Data("\"wat\"".utf8)
+        XCTAssertThrowsError(try JSONDecoder().decode(ArtChoice.self, from: data))
+    }
 }

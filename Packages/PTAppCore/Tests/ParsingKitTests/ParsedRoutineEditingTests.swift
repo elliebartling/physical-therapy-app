@@ -57,4 +57,43 @@ final class ParsedRoutineEditingTests: XCTestCase {
 
         XCTAssertEqual(r.orderedExercises.map(\.name), ["Side plank", "Bridges"])
     }
+
+    private func birdDogRoutine() -> Routine {
+        Routine(name: "R", exercises: [
+            Exercise(name: "Bird Dog", target: .repsSets(reps: 10, sets: 3), restSeconds: 30,
+                     side: .both, order: 0, art: .library(slug: "bird-dog")),
+        ])
+    }
+
+    func test_draftingASavedRoutineKeepsArt() {
+        let draft = ParsedRoutine(routine: birdDogRoutine())
+        XCTAssertEqual(draft.exercises.first?.art, .library(slug: "bird-dog"))
+    }
+
+    func test_applyPreservesArtOnUntouchedExercises() {
+        // Editing the name must not erase the picture.
+        let r = birdDogRoutine()
+        var draft = ParsedRoutine(routine: r)
+        draft.exercises[0].name = "Bird Dog (right)"
+        draft.apply(to: r)
+        XCTAssertEqual(r.orderedExercises.first?.art, .library(slug: "bird-dog"))
+        XCTAssertEqual(r.orderedExercises.first?.name, "Bird Dog (right)")
+    }
+
+    func test_applyWritesAChangedArtChoice() {
+        let r = birdDogRoutine()
+        var draft = ParsedRoutine(routine: r)
+        draft.exercises[0].art = .none
+        draft.apply(to: r)
+        XCTAssertEqual(r.orderedExercises.first?.art, ArtChoice.none)
+    }
+
+    func test_applyCarriesArtOntoNewExercises() {
+        let r = birdDogRoutine()
+        var draft = ParsedRoutine(routine: r)
+        draft.exercises.append(.init(name: "Plank", reps: nil, sets: 2, durationSec: 30, restSec: 20,
+                                     side: "both", notes: "", art: .library(slug: "plank")))
+        draft.apply(to: r)
+        XCTAssertEqual(r.orderedExercises.last?.art, .library(slug: "plank"))
+    }
 }
