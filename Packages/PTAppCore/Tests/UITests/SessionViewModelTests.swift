@@ -90,4 +90,39 @@ final class TimerReadingTests: XCTestCase {
         XCTAssertEqual(reading.remaining, 10)
         XCTAssertEqual(reading.fraction, 0)
     }
+
+    func test_pause_holdsTheTimerStill_andResumeCarriesOn() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let sessionRepo = SessionRepository(context: container.mainContext)
+        let routine = Routine(name: "T", exercises: [
+            Exercise(name: "Wall sit", target: .timeSets(seconds: 30, sets: 1), restSeconds: 0, side: .both, order: 0)
+        ])
+        let vm = SessionViewModel(routine: routine, sessionRepo: sessionRepo, clock: ManualClock(),
+                                  audio: nil, haptics: nil, health: nil)
+        let run = Task { await vm.run() }
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(vm.display, .hold(seconds: 30))
+        let startedAt = vm.displayStartedAt
+
+        vm.pause()
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertNotNil(vm.pausedAt)
+        XCTAssertTrue(vm.isPaused)
+        // While paused the reading is taken at the pause, however long it lasts.
+        let held = TimerReading(display: vm.display, startedAt: vm.displayStartedAt,
+                                now: vm.pausedAt ?? .now)
+        XCTAssertEqual(held.remaining, 30)
+
+        try await Task.sleep(nanoseconds: 300_000_000)
+        vm.resume()
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertNil(vm.pausedAt)
+        // Paused for at least 0.3s, so the start moves on by at least that much.
+        XCTAssertGreaterThanOrEqual(vm.displayStartedAt.timeIntervalSince(startedAt), 0.3)
+        XCTAssertLessThan(vm.displayStartedAt.timeIntervalSince(startedAt),
+                          Date.now.timeIntervalSince(startedAt))
+
+        run.cancel()
+        _ = container
+    }
 }
