@@ -6,7 +6,9 @@ import UI
 
 struct RootView: View {
     enum Route: Hashable { case home, setup, editRoutine, session, complete, settings }
+    enum HomeTab: Hashable { case today, progress }
     @State private var route: Route = .home
+    @State private var tab: HomeTab = .today
     @State private var lastStreak: Int = 0
 
     @AppStorage(AccentChoice.storageKey) private var accentRaw = AccentChoice.signal.rawValue
@@ -21,13 +23,22 @@ struct RootView: View {
         Group {
             switch route {
             case .home:
-                HomeView(
-                    viewModel: HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo),
-                    onStart: { route = .session },
-                    onSettings: { route = .settings },
-                    onSetup: { route = .setup },
-                    onEditRoutine: { route = .editRoutine }
-                )
+                TabView(selection: $tab) {
+                    Tab("Today", systemImage: "sun.max", value: HomeTab.today) {
+                        HomeView(
+                            viewModel: HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo),
+                            onStart: { route = .session },
+                            onSettings: { route = .settings },
+                            onSetup: { route = .setup },
+                            onEditRoutine: { route = .editRoutine }
+                        )
+                    }
+                    Tab("Progress", systemImage: "chart.bar.xaxis", value: HomeTab.progress) {
+                        ProgressScreen(
+                            viewModel: ProgressViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo)
+                        )
+                    }
+                }
             case .editRoutine:
                 if let routine = try? routineRepo.fetchActive() {
                     EditRoutineView(routine: routine, repo: routineRepo, onDone: { route = .home })

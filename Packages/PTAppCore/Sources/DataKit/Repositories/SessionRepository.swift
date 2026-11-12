@@ -14,6 +14,12 @@ public final class SessionRepository {
         try context.save()
     }
 
+    /// Removes a session and its exercise records, e.g. one logged by mistake.
+    public func delete(_ record: SessionRecord) throws {
+        context.delete(record)
+        try context.save()
+    }
+
     public func fetchAll() throws -> [SessionRecord] {
         try context.fetch(
             FetchDescriptor<SessionRecord>(sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
