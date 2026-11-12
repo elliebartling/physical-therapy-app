@@ -123,4 +123,87 @@ final class SetupViewModelTests: XCTestCase {
         XCTAssertNil(vm.editorVM)
         _ = container
     }
+
+    // MARK: - A new sheet for an existing routine
+
+    private func phase1(in repo: RoutineRepository) throws {
+        try repo.save(Routine(name: "Knee", exercises: [
+            Exercise(name: "Bridges", target: .repsSets(reps: 10, sets: 3), restSeconds: 30, side: .both, order: 0),
+            Exercise(name: "Wall sit", target: .timeSets(seconds: 30, sets: 3), restSeconds: 30, side: .both, order: 1),
+        ]))
+    }
+
+    private let newSheet = ParsedRoutine(name: "Knee", exercises: [
+        .init(name: "Bridges", reps: 15, sets: 3, durationSec: nil, restSec: 30, side: "both", notes: ""),
+        .init(name: "Step ups", reps: 10, sets: 2, durationSec: nil, restSec: 30, side: "both", notes: ""),
+    ])
+
+    func test_firstRoutine_savesWithoutReview() throws {
+        let container = try ModelContainerFactory.inMemory()
+        let repo = RoutineRepository(context: container.mainContext)
+        let vm = SetupViewModel(routineRepo: repo)
+        XCTAssertFalse(vm.isReplacing)
+        vm.draft = newSheet
+
+        vm.save()
+
+        XCTAssertEqual(vm.phase, .saved)
+        XCTAssertEqual(try repo.fetchActive()?.exercises.count, 2)
+        _ = container
+    }
+
+    func test_newSheet_showsWhatChanged_beforeReplacing() throws {
+        let container = try ModelContainerFactory.inMemory()
+        let repo = RoutineRepository(context: container.mainContext)
+        try phase1(in: repo)
+        let vm = SetupViewModel(routineRepo: repo)
+        XCTAssertTrue(vm.isReplacing)
+        XCTAssertEqual(vm.current?.phase, 1)
+        vm.draft = newSheet
+
+        vm.save()
+
+        guard case .reviewing(let changes) = vm.phase else {
+            return XCTFail("expected .reviewing, got \(vm.phase)")
+        }
+        XCTAssertEqual(changes.items.map(\.name), ["Bridges", "Step ups", "Wall sit"])
+        XCTAssertEqual(changes.items.map(\.kind), [.changed, .added, .removed])
+        // Nothing is replaced until it's confirmed.
+        XCTAssertEqual(try repo.fetchActive()?.phase, 1)
+        _ = container
+    }
+
+    func test_confirmingTheReview_replacesWithTheNextPhase() throws {
+        let container = try ModelContainerFactory.inMemory()
+        let repo = RoutineRepository(context: container.mainContext)
+        try phase1(in: repo)
+        let vm = SetupViewModel(routineRepo: repo)
+        vm.draft = newSheet
+        vm.save()
+
+        vm.confirm()
+
+        XCTAssertEqual(vm.phase, .saved)
+        let active = try XCTUnwrap(repo.fetchActive())
+        XCTAssertEqual(active.phase, 2)
+        XCTAssertEqual(active.orderedExercises.map(\.name), ["Bridges", "Step ups"])
+        _ = container
+    }
+
+    func test_backFromReview_returnsToTheEditorWithEditsKept() throws {
+        let container = try ModelContainerFactory.inMemory()
+        let repo = RoutineRepository(context: container.mainContext)
+        try phase1(in: repo)
+        let vm = SetupViewModel(routineRepo: repo)
+        vm.draft = newSheet
+        vm.editorVM = RoutineEditorViewModel(parsed: newSheet)
+        vm.phase = .editing
+        vm.save()
+
+        vm.backToEditing()
+
+        XCTAssertEqual(vm.phase, .editing)
+        XCTAssertEqual(vm.editorVM?.exercises.map(\.name), ["Bridges", "Step ups"])
+        _ = container
+    }
 }

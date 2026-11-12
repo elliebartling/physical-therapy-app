@@ -38,7 +38,21 @@ public final class RoutineRepository {
         try context.save()
     }
 
+    /// Makes `routine` the active one, as the next phase of the current routine.
+    /// The current routine is kept, inactive, so its sessions still read well. New exercises
+    /// whose names match current ones continue their lineage, so history spans phases.
     public func replaceActive(with routine: Routine) throws {
+        if let current = try fetchActive() {
+            let currentExercises = current.orderedExercises
+            let newExercises = routine.orderedExercises
+            let changes = RoutineChanges(from: currentExercises.map { ExerciseSpec($0) },
+                                         to: newExercises.map { ExerciseSpec($0) })
+            for (newIndex, oldIndex) in changes.matches {
+                newExercises[newIndex].lineageID = currentExercises[oldIndex].lineageID
+            }
+            routine.phase = current.phase + 1
+            routine.previousVersionID = current.id
+        }
         for old in try fetchAll() where old.isActive {
             old.isActive = false
         }

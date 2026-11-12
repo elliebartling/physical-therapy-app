@@ -64,6 +64,8 @@ public final class ProgressViewModel {
     private var sessions: [SessionRecord] = []
     private var names: [UUID: String] = [:]
     private var order: [UUID: Int] = [:]
+    /// Exercise id → lineage, so one exercise's history spans routine phases.
+    private var lineage: [UUID: UUID] = [:]
 
     public init(routineRepo: RoutineRepository, sessionRepo: SessionRepository,
                 today: Date = .now, calendar: Calendar = .current) {
@@ -85,11 +87,12 @@ public final class ProgressViewModel {
         }
     }
 
-    /// Every time the exercise came up, newest first.
+    /// Every time the exercise came up, in this phase or earlier ones, newest first.
     public func entries(forExercise id: UUID) -> [ExerciseEntry] {
-        sessions
+        let group = lineage[id] ?? id
+        return sessions
             .flatMap(\.exerciseRecords)
-            .filter { $0.exerciseID == id }
+            .filter { (lineage[$0.exerciseID] ?? $0.exerciseID) == group }
             .map { ExerciseEntry(id: $0.id, date: $0.completedAt ?? $0.startedAt, isDone: $0.status == .completed) }
             .sorted { $0.date > $1.date }
     }
@@ -122,18 +125,19 @@ public final class ProgressViewModel {
         let allExercises = routines.flatMap(\.exercises)
         names = Dictionary(allExercises.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         order = Dictionary(allExercises.map { ($0.id, $0.order) }, uniquingKeysWith: { first, _ in first })
+        lineage = Dictionary(allExercises.map { ($0.id, $0.lineageID) }, uniquingKeysWith: { first, _ in first })
 
         weeks = ProgressStats.weeklyDays(in: sessions, weeks: Self.weeksShown, today: today, calendar: calendar)
         activeDays = weeks.reduce(0) { $0 + $1.days }
         streak = StreakCalculator.currentStreak(in: sessions, today: today, calendar: calendar)
 
-        let stats = ProgressStats.exerciseStats(in: sessions)
+        let stats = ProgressStats.exerciseStats(in: sessions, groupedBy: { [lineage] in lineage[$0] ?? $0 })
         let active = routines.first(where: \.isActive)?.orderedExercises ?? []
         exercises = active.map { exercise in
             ExerciseRow(id: exercise.id,
                         name: exercise.name,
                         prescription: Prescription.text(target: exercise.target, side: exercise.side),
-                        stats: stats[exercise.id] ?? ExerciseStats())
+                        stats: stats[exercise.lineageID] ?? ExerciseStats())
         }
 
         let rows = sessions.sorted { $0.startedAt > $1.startedAt }.map(row(for:))

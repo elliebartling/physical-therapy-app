@@ -73,10 +73,15 @@ public struct SetupView: View {
             }
         case .editing:
             if let editorVM = viewModel.editorVM {
-                RoutineEditorView(viewModel: editorVM, onSave: { try? viewModel.commit() })
+                RoutineEditorView(viewModel: editorVM, onSave: viewModel.save)
             } else {
                 Text("Editor unavailable")
             }
+        case .reviewing(let changes):
+            RoutineChangesView(changes: changes,
+                               currentPhase: viewModel.current?.phase ?? 1,
+                               onReplace: viewModel.confirm,
+                               onBack: viewModel.backToEditing)
         case .saved:
             VStack(alignment: .leading, spacing: AppSpacing.s(2)) {
                 Spacer()
@@ -112,17 +117,19 @@ public struct SetupView: View {
                     .buttonStyle(GlassCircleButtonStyle())
                     .accessibilityLabel("Cancel")
                     Spacer()
-                    SectionLabel("New routine")
+                    SectionLabel(viewModel.isReplacing ? "New sheet" : "New routine")
                 }
                 InkRule(weight: 2)
             }
             .padding(.top, AppSpacing.s(1))
 
-            Text("Add your routine")
+            Text(viewModel.isReplacing ? "Update your routine" : "Add your routine")
                 .font(AppFont.display(40, weight: .bold))
                 .tracking(-1.6)
                 .padding(.top, 22)
-            Text("Scan the pages, pick screenshots or a file, or just talk it through. Everything is read on this iPhone.")
+            Text(viewModel.isReplacing
+                 ? "Bring in the new sheet from your PT. You'll see what changed before anything is replaced."
+                 : "Scan the pages, pick screenshots or a file, or just talk it through. Everything is read on this iPhone.")
                 .font(AppFont.body(15))
                 .foregroundStyle(AppColor.inkSecondary)
                 .padding(.top, 10)

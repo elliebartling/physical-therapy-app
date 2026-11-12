@@ -11,6 +11,9 @@ public final class Exercise {
     public var notes: String
     public var order: Int
     @Relationship(deleteRule: .cascade) public var media: [Asset]
+    /// Shared by the same exercise across routine versions. Optional so stores
+    /// from before versioning migrate; read it through `lineageID`.
+    public var lineageStorage: UUID?
 
     public init(
         id: UUID = UUID(),
@@ -20,7 +23,8 @@ public final class Exercise {
         side: Side,
         notes: String = "",
         order: Int = 0,
-        media: [Asset] = []
+        media: [Asset] = [],
+        lineageID: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -30,6 +34,14 @@ public final class Exercise {
         self.notes = notes
         self.order = order
         self.media = media
+        self.lineageStorage = lineageID
+    }
+
+    /// The same exercise across phases: history and charts group by this.
+    /// An exercise that has never been carried over is its own lineage.
+    public var lineageID: UUID {
+        get { lineageStorage ?? id }
+        set { lineageStorage = newValue }
     }
 
     public var target: ExerciseTarget {
