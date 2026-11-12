@@ -12,7 +12,10 @@ final class SetupViewTests: XCTestCase {
         vm.startManual()
         let view = SetupView(viewModel: vm, onDone: {})
 
-        try view.inspect().find(button: "Cancel").tap()
+        // ViewInspector can't reach toolbar items, so take the editor setup shows and use its Cancel.
+        let editor = try view.inspect().find(RoutineEditorView.self).actualView()
+        let cancel = try XCTUnwrap(editor.onCancel, "setup's editor should offer Cancel")
+        cancel()
 
         XCTAssertEqual(vm.phase, .idle)
         XCTAssertNil(vm.editorVM)
