@@ -84,6 +84,7 @@ public struct CandidateScorer: Sendable {
         "x", "set", "sets", "rep", "reps", "right", "left", "bilateral", "each",
         "per", "page", "sec", "secs", "second", "seconds", "min", "mins",
         "minute", "minutes", "daily", "times", "time", "day", "days", "week",
+        "hold", "repeat", "slowly",
     ]
 
     /// Letter-only tokens, noise removed, trivial plurals folded.
@@ -95,7 +96,11 @@ public struct CandidateScorer: Sendable {
     }
 
     private static func singular(_ word: String) -> String {
-        guard word.count > 3, word.hasSuffix("s"), !word.hasSuffix("ss") else { return word }
-        return String(word.dropLast())
+        guard word.count > 3, word.hasSuffix("s") else { return word }
+        // Sibilant plurals take "-es" (stretches, crunches, presses, boxes).
+        for suffix in ["ches", "shes", "sses", "xes", "zes"] where word.hasSuffix(suffix) {
+            return String(word.dropLast(2))
+        }
+        return word.hasSuffix("ss") ? word : String(word.dropLast())
     }
 }

@@ -18,8 +18,12 @@ final class CandidateScorerTests: XCTestCase {
             ("Clamshells, 3 sets", "clamshell"),
         ]
         for (input, expected) in cases {
-            let slugs = s.candidates(for: input).map(\.entry.slug)
+            let c = s.candidates(for: input)
+            let slugs = c.map(\.entry.slug)
             XCTAssertTrue(slugs.contains(expected), "\(input) → \(slugs)")
+            // Task 5's widening threshold is calibrated against these scores.
+            let score = c.first { $0.entry.slug == expected }?.score ?? 0
+            XCTAssertGreaterThanOrEqual(score, 0.6, "\(input) → \(score)")
         }
     }
 
@@ -42,13 +46,37 @@ final class CandidateScorerTests: XCTestCase {
     }
 
     func test_respectsLimit() {
-        XCTAssertLessThanOrEqual(CandidateScorer().candidates(for: "squat", limit: 3).count, 3)
+        let s = CandidateScorer()
+        XCTAssertGreaterThan(s.candidates(for: "squat", limit: 100).count, 3)
+        XCTAssertEqual(s.candidates(for: "squat", limit: 3).count, 3)
     }
 
     func test_scoresAreDescendingAndNormalised() {
         let c = CandidateScorer().candidates(for: "bridge")
+        XCTAssertFalse(c.isEmpty)
         XCTAssertEqual(c, c.sorted { $0.score > $1.score })
         XCTAssertTrue(c.allSatisfy { (0...1).contains($0.score) })
+    }
+
+    func test_esPluralsFoldLikeTheirSingulars() {
+        let s = CandidateScorer()
+        for (plural, singular) in [("Hamstring Stretches", "Hamstring Stretch"),
+                                   ("Crunches", "Crunch")] {
+            let p = s.candidates(for: plural).first
+            let q = s.candidates(for: singular).first
+            XCTAssertNotNil(p, plural)
+            XCTAssertEqual(p?.entry.slug, q?.entry.slug)
+            XCTAssertEqual(p?.score, q?.score)
+        }
+    }
+
+    func test_holdAnnotationDoesNotLowerTheScore() {
+        let s = CandidateScorer()
+        let plain = s.candidates(for: "Clamshell").first?.score ?? 0
+        XCTAssertEqual(s.candidates(for: "Clamshell Hold 5 sec").first?.score ?? 0, plain, accuracy: 1e-9)
+        let bridge = s.candidates(for: "Supine Glute Bridge Hold")
+            .first { $0.entry.slug == "glute-bridge" }?.score ?? 0
+        XCTAssertGreaterThanOrEqual(bridge, 0.6)
     }
 
     func test_exactMatchScoresNearOneAndIncidentalWordScoresLow() {
