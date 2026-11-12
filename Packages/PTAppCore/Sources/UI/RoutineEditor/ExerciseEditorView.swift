@@ -79,7 +79,7 @@ private struct PictureLink: View {
 
     var body: some View {
         NavigationLink {
-            ArtPickerView(art: $exercise.art, exerciseName: exercise.name)
+            ArtPickerView(art: $exercise.art, exerciseName: exercise.name, notes: exercise.notes)
         } label: {
             HStack(spacing: 14) {
                 ExerciseFigure(art: exercise.art)
@@ -89,5 +89,6 @@ private struct PictureLink: View {
             }
             .frame(minHeight: 72)
         }
+        .accessibilityValue(ArtPickerView.pictureDescription(for: exercise.art))
     }
 }

@@ -16,11 +16,48 @@ final class ArtPickerViewTests: XCTestCase {
     }
 
     func test_pickerOffersNoPictureImmediately() throws {
+        // ViewInspector never runs `.task`, so this is the pre-suggestions state.
         var art = ArtChoice.unmatched
-        let v = ArtPickerView(art: Binding(get: { art }, set: { art = $0 }),
-                              exerciseName: "Bird Dog",
-                              matcher: ExerciseMatcher(ranker: StubRanker(slugs: ["bird-dog", "dead-bug"])))
+        let v = ArtPickerView(art: Binding(get: { art }, set: { art = $0 }), exerciseName: "Bird Dog")
         XCTAssertNoThrow(try v.inspect().find(text: "No picture"))
+    }
+
+    func test_currentChoiceAbsentFromSuggestionsIsStillListed() throws {
+        let deadBug = try XCTUnwrap(ExerciseCatalog.bundled.entry(slug: "dead-bug"))
+        let birdDog = try XCTUnwrap(ExerciseCatalog.bundled.entry(slug: "bird-dog"))
+        let shown = ArtPickerView.displayedEntries(current: .library(slug: "bird-dog"), suggestions: [deadBug])
+        XCTAssertEqual(shown.map(\.slug), [birdDog.slug, deadBug.slug])
+    }
+
+    func test_currentChoiceAlreadySuggestedIsNotDuplicated() throws {
+        let birdDog = try XCTUnwrap(ExerciseCatalog.bundled.entry(slug: "bird-dog"))
+        let shown = ArtPickerView.displayedEntries(current: .library(slug: "bird-dog"), suggestions: [birdDog])
+        XCTAssertEqual(shown.map(\.slug), ["bird-dog"])
+    }
+
+    func test_currentChoiceShowsBeforeAnySuggestionsArrive() throws {
+        let birdDog = try XCTUnwrap(ExerciseCatalog.bundled.entry(slug: "bird-dog"))
+        var art = ArtChoice.library(slug: "bird-dog")
+        let v = ArtPickerView(art: Binding(get: { art }, set: { art = $0 }), exerciseName: "x")
+        XCTAssertNoThrow(try v.inspect().find(text: birdDog.name))
+    }
+
+    func test_pictureValueDescribesTheCurrentChoice() throws {
+        let birdDog = try XCTUnwrap(ExerciseCatalog.bundled.entry(slug: "bird-dog"))
+        XCTAssertEqual(ArtPickerView.pictureDescription(for: .library(slug: "bird-dog")), birdDog.name)
+        XCTAssertEqual(ArtPickerView.pictureDescription(for: ArtChoice.none), "None")
+        XCTAssertEqual(ArtPickerView.pictureDescription(for: .unmatched), "Not set")
+        XCTAssertEqual(ArtPickerView.pictureDescription(for: .library(slug: "gone")), "Not set")
+    }
+
+    func test_editorPassesNotesToThePicker() throws {
+        var ex = exercise()
+        ex.notes = "on hands and knees"
+        let v = ExerciseEditorView(exercise: Binding(get: { ex }, set: { ex = $0 }))
+        let picker = try v.inspect().find(ViewType.NavigationLink.self, where: {
+            (try? $0.view(ArtPickerView.self, 0)) != nil
+        }).view(ArtPickerView.self, 0)
+        XCTAssertEqual(try picker.actualView().notes, "on hands and knees")
     }
 
     func test_choosingNoPictureSetsNone() throws {
@@ -82,6 +119,7 @@ final class ArtPickerViewTests: XCTestCase {
         }))
     }
 
+    /// A pin: a new exercise is `.unmatched` (retryable), never `.none`.
     func test_addExerciseStartsUnmatched() {
         let vm = RoutineEditorViewModel(name: "R", exercises: [])
         vm.addExercise()
