@@ -27,6 +27,7 @@
 - App code lives in `Packages/PTAppCore`. Never edit the generated `.xcodeproj`. App-target settings go in `App/project.yml`.
 - Asset base URL, used verbatim: `https://cdn.jsdelivr.net/npm/@bryllim/workout-guide@1.0.0/assets/<slug>/frame-<n>.png`
 - Attribution text, used verbatim: `Exercise illustrations by Bryl Lim, licensed CC BY-SA 4.0. Derived from Everkinetic.`
+- **Always write `ArtChoice.none`, never a bare `.none`, in any comparison whose other side is an `Optional<ArtChoice>`** — for example `exercise?.art` or `vm.exercise(id:)?.art`. A bare `.none` there resolves to `Optional.none`, so the assertion silently becomes "is not nil" and passes without testing anything. Qualify it everywhere, including where the other side happens to be non-optional, so the habit never has to be judged case by case.
 
 **Existing interfaces this plan builds on** — read before assuming any shape:
 
@@ -177,9 +178,9 @@ func test_applyWritesAChangedArtChoice() {
                  side: .both, order: 0, art: .library(slug: "bird-dog")),
     ])
     var draft = ParsedRoutine(routine: routine)
-    draft.exercises[0].art = .none
+    draft.exercises[0].art = ArtChoice.none
     draft.apply(to: routine)
-    XCTAssertEqual(routine.orderedExercises.first?.art, .none)
+    XCTAssertEqual(routine.orderedExercises.first?.art, ArtChoice.none)
 }
 
 func test_decodingWithoutArtDefaultsToUnmatched() throws {
