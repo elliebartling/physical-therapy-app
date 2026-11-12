@@ -90,7 +90,10 @@ final class TimerReadingTests: XCTestCase {
         XCTAssertEqual(reading.remaining, 10)
         XCTAssertEqual(reading.fraction, 0)
     }
+}
 
+@MainActor
+final class SessionPauseTests: XCTestCase {
     func test_pause_holdsTheTimerStill_andResumeCarriesOn() async throws {
         let container = try ModelContainerFactory.inMemory()
         let sessionRepo = SessionRepository(context: container.mainContext)
