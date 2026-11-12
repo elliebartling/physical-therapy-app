@@ -52,4 +52,21 @@ final class HomeViewModelTests: XCTestCase {
 
         _ = container
     }
+
+    func test_rowsCarryArtChoice() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let ctx = container.mainContext
+        let routineRepo = RoutineRepository(context: ctx)
+        let sessionRepo = SessionRepository(context: ctx)
+        try routineRepo.save(Routine(name: "R", exercises: [
+            Exercise(name: "Bird Dog", target: .repsSets(reps: 10, sets: 3), restSeconds: 30,
+                     side: .both, order: 0, art: .library(slug: "bird-dog")),
+            Exercise(name: "Stretch", target: .repsSets(reps: 5, sets: 1), restSeconds: 0,
+                     side: .both, order: 1, art: ArtChoice.none),
+        ]))
+        let vm = HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo)
+        await vm.refresh()
+        XCTAssertEqual(vm.rows.map(\.art), [.library(slug: "bird-dog"), ArtChoice.none])
+        _ = container
+    }
 }

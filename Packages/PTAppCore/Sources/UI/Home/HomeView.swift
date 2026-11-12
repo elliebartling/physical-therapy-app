@@ -275,11 +275,14 @@ private struct ExerciseRowView: View {
     let row: HomeViewModel.ExerciseRow
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 0) {
+        HStack(alignment: .center, spacing: 0) {
             Text(row.number)
                 .font(AppFont.mono(11))
                 .foregroundStyle(AppColor.inkSecondary)
                 .frame(width: 30, alignment: .leading)
+            ExerciseFigure(art: row.art)
+                .frame(width: 44, height: 44)
+                .padding(.trailing, 12)
             Text(row.name)
                 .font(AppFont.display(16, weight: .medium))
             Spacer(minLength: 12)

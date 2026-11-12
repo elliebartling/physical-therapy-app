@@ -11,6 +11,7 @@ public struct SessionView: View {
     @State private var confirmingEnd = false
     @Environment(\.appAccent) private var accent
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     public init(viewModel: SessionViewModel, onComplete: @escaping (SessionRecord) -> Void,
                 onEnd: @escaping () -> Void = {}) {
@@ -104,6 +105,11 @@ public struct SessionView: View {
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if showsFigure {
+                ExerciseFigure(art: viewModel.currentArt)
+                    .frame(maxWidth: 96, maxHeight: 96, alignment: .leading)
+                    .layoutPriority(-1)
+            }
             Text(viewModel.isResting ? "Rest" : viewModel.currentExerciseName)
                 .font(AppFont.display(56, weight: .bold))
                 .tracking(-2.6)
@@ -120,6 +126,12 @@ public struct SessionView: View {
                     .lineLimit(3)
             }
         }
+    }
+
+    /// The timer outranks the picture: at accessibility sizes the figure steps aside,
+    /// and otherwise it is the first thing to shrink when space runs short.
+    private var showsFigure: Bool {
+        !viewModel.isResting && !dynamicTypeSize.isAccessibilitySize
     }
 
     private var metaLine: String {

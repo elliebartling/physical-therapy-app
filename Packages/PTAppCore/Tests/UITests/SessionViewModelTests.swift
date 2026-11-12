@@ -66,6 +66,22 @@ final class SessionViewModelTests: XCTestCase {
 
         _ = container
     }
+
+    func test_currentArtIsTheFirstExercisesArtBeforeTheSessionRuns() throws {
+        let container = try ModelContainerFactory.inMemory()
+        let sessionRepo = SessionRepository(context: container.mainContext)
+        let routine = Routine(name: "T", exercises: [
+            Exercise(name: "Bird Dog", target: .repsSets(reps: 10, sets: 1), restSeconds: 0,
+                     side: .both, order: 0, art: .library(slug: "bird-dog")),
+            Exercise(name: "Plank", target: .timeSets(seconds: 30, sets: 1), restSeconds: 0,
+                     side: .both, order: 1, art: ArtChoice.none),
+        ])
+        let vm = SessionViewModel(routine: routine, sessionRepo: sessionRepo, clock: TestClock(),
+                                  audio: nil, haptics: nil)
+        XCTAssertEqual(vm.currentArt, .library(slug: "bird-dog"))
+        _ = container
+    }
+
 }
 
 final class TimerReadingTests: XCTestCase {

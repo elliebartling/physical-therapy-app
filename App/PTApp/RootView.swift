@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import DataKit
 import HistoryKit
+import MediaKit
 import UI
 
 struct RootView: View {
@@ -11,6 +12,8 @@ struct RootView: View {
     @State private var tab: HomeTab = .today
     @State private var lastStreak: Int = 0
     @State private var finishedSession: SessionRecord?
+    /// One store for the whole app, so frames are downloaded once and in-flight requests are shared.
+    @State private var artStore = ArtStore()
 
     @AppStorage(AccentChoice.storageKey) private var accentRaw = AccentChoice.signal.rawValue
     @Environment(\.modelContext) private var modelContext
@@ -88,6 +91,7 @@ struct RootView: View {
             }
         }
         .environment(\.appAccent, accent)
+        .environment(\.artStore, artStore)
         .tint(AppColor.ink)
     }
 }
