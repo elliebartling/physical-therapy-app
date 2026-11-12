@@ -17,6 +17,8 @@ public final class ProgressViewModel {
         public let stats: ExerciseStats
         /// The most recent rating it was given, if any.
         public let lastRating: ExerciseRating?
+        /// Read from the live exercise; rows exist only for the active routine, so it is always known.
+        public let art: ArtChoice
     }
 
     public struct SessionItem: Identifiable, Equatable {
@@ -145,7 +147,8 @@ public final class ProgressViewModel {
                         name: exercise.name,
                         prescription: Prescription.text(target: exercise.target, side: exercise.side),
                         stats: stats[exercise.lineageID] ?? ExerciseStats(),
-                        lastRating: entries(forExercise: exercise.id).first(where: { $0.rating != nil })?.rating)
+                        lastRating: entries(forExercise: exercise.id).first(where: { $0.rating != nil })?.rating,
+                        art: exercise.art)
         }
 
         let rows = sessions.sorted { $0.startedAt > $1.startedAt }.map(row(for:))

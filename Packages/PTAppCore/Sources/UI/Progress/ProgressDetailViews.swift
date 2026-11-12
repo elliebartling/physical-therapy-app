@@ -9,6 +9,7 @@ struct ExerciseProgressView: View {
         ScrollView {
             if let row = viewModel.exercise(id: exerciseID) {
                 VStack(alignment: .leading, spacing: 0) {
+                    ExerciseIllustration(art: row.art).padding(.bottom, 20)
                     Text(row.name)
                         .font(AppFont.display(30, weight: .bold))
                         .tracking(-1)
