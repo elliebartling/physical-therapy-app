@@ -61,6 +61,15 @@ final class ProgressViewModelTests: XCTestCase {
         return record
     }
 
+    func test_exerciseRowCarriesTheSheetHowTo() throws {
+        let section = HowToSection(heading: "Tip", body: "Keep your heels down.")
+        bridges.sheetHowTo = [section]
+        try routineRepo.save(routine)
+        let vm = viewModel()
+        XCTAssertEqual(vm.exercise(id: bridges.id)?.sheetHowTo, [section])
+        XCTAssertEqual(vm.exercise(id: wallSit.id)?.sheetHowTo, [])
+    }
+
     func test_exerciseRowCarriesItsArt() throws {
         bridges.art = .library(slug: "bird-dog")
         try routineRepo.save(routine)

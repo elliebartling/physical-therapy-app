@@ -1,5 +1,6 @@
 import Foundation
 import FoundationModels
+import DataKit
 
 /// On-device LLM extractor. One of two files in the package allowed to
 /// import FoundationModels (the other is MediaKit/FoundationModelsRanker.swift).
@@ -44,6 +45,9 @@ public struct FoundationModelsExtractor: RoutineExtractor {
     sets, restSec, side (one of: both, left, right, alternating), and notes.
     Default sets to 3, reps to 10, restSec to 30, and side to "both" if not stated. \
     Ignore page furniture such as dates, clinic names, page numbers, and contact details.
+    Where the handout prints labelled instruction text for an exercise, copy each block into \
+    sheetHowTo with its heading verbatim, in printed order; leave sheetHowTo empty otherwise. \
+    Never write instructions of your own, and keep that text out of notes.
     """
 }
 
@@ -74,6 +78,8 @@ struct GenerableExercise {
     var side: String
     @Guide(description: "Extra instructions; empty string when none")
     var notes: String
+    @Guide(description: "The handout's own labelled instruction blocks for this exercise (for example Setup, Movement, Tip, or whatever headings the sheet uses), in the order printed, each with its heading copied verbatim and its text copied from the sheet. Empty when the sheet has no instruction text for this exercise. Never write or paraphrase instructions that are not on the sheet.")
+    var sheetHowTo: [GenerableHowToSection]
 
     func toParsedExercise() -> ParsedRoutine.ParsedExercise {
         let validSides = ["both", "left", "right", "alternating"]
@@ -85,7 +91,23 @@ struct GenerableExercise {
             durationSec: durationSec.map { max(0, $0) },
             restSec: max(0, restSec),
             side: validSides.contains(normalizedSide) ? normalizedSide : "both",
-            notes: notes
+            notes: notes,
+            sheetHowTo: sheetHowTo.compactMap { $0.toHowToSection() }
         )
+    }
+}
+
+@Generable
+struct GenerableHowToSection {
+    @Guide(description: "The block's heading exactly as printed on the sheet")
+    var heading: String
+    @Guide(description: "The block's text as printed on the sheet")
+    var body: String
+
+    func toHowToSection() -> HowToSection? {
+        let heading = heading.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else { return nil }
+        return HowToSection(heading: heading, body: body)
     }
 }

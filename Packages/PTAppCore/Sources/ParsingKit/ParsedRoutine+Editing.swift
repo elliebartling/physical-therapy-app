@@ -23,12 +23,14 @@ public extension ParsedRoutine {
                 exercise.side = draft.resolvedSide
                 exercise.notes = draft.notes
                 exercise.art = draft.art
+                exercise.sheetHowTo = draft.sheetHowTo
                 exercise.order = index
                 return exercise
             }
             return Exercise(id: draft.id, name: draft.name, target: draft.target,
                             restSeconds: draft.restSec, side: draft.resolvedSide,
-                            notes: draft.notes, order: index, art: draft.art)
+                            notes: draft.notes, order: index, art: draft.art,
+                            sheetHowTo: draft.sheetHowTo)
         }
         let keptIDs = Set(kept.map(\.id))
         let removed = routine.exercises.filter { !keptIDs.contains($0.id) }
@@ -48,7 +50,8 @@ extension ParsedRoutine.ParsedExercise {
         }
         self.init(id: exercise.id, name: exercise.name, reps: reps, sets: sets,
                   durationSec: durationSec, restSec: exercise.restSeconds,
-                  side: exercise.side.rawValue, notes: exercise.notes, art: exercise.art)
+                  side: exercise.side.rawValue, notes: exercise.notes, art: exercise.art,
+                  sheetHowTo: exercise.sheetHowTo)
     }
 
     var target: ExerciseTarget {

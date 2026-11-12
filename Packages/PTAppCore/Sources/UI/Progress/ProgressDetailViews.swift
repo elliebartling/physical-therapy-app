@@ -18,6 +18,7 @@ struct ExerciseProgressView: View {
                         .font(AppFont.mono(13))
                         .foregroundStyle(AppColor.inkSecondary)
                         .padding(.top, 6)
+                    SheetHowToView(sections: row.sheetHowTo).padding(.top, 20)
                     figures(row).padding(.top, 24)
                     timeline.padding(.top, 28)
                 }

@@ -6,7 +6,7 @@ final class FoundationModelsExtractorTests: XCTestCase {
     func test_dtoMapping_repsBased() {
         let dto = GenerableExercise(
             name: "Squats", reps: 10, sets: 3, durationSec: nil,
-            restSec: 45, side: "left", notes: "slow tempo"
+            restSec: 45, side: "left", notes: "slow tempo", sheetHowTo: []
         )
         let ex = dto.toParsedExercise()
         XCTAssertEqual(ex.name, "Squats")
@@ -21,7 +21,7 @@ final class FoundationModelsExtractorTests: XCTestCase {
     func test_dtoMapping_timeBased_andRoutineName() {
         let dto = GenerableRoutine(name: "Knee rehab", exercises: [
             GenerableExercise(name: "Plank", reps: nil, sets: 2, durationSec: 30,
-                              restSec: 30, side: "both", notes: "")
+                              restSec: 30, side: "both", notes: "", sheetHowTo: [])
         ])
         let parsed = dto.toParsedRoutine()
         XCTAssertEqual(parsed.name, "Knee rehab")
@@ -31,8 +31,30 @@ final class FoundationModelsExtractorTests: XCTestCase {
 
     func test_dtoMapping_invalidSide_normalizesToBoth() {
         let dto = GenerableExercise(name: "X", reps: 5, sets: 1, durationSec: nil,
-                                    restSec: 0, side: "EACH SIDE??", notes: "")
+                                    restSec: 0, side: "EACH SIDE??", notes: "", sheetHowTo: [])
         XCTAssertEqual(dto.toParsedExercise().side, "both")
+    }
+
+    func test_dtoMapping_carriesSheetSectionsVerbatimInOrder() {
+        let dto = GenerableExercise(
+            name: "Slant board stretch", reps: 10, sets: 3, durationSec: nil,
+            restSec: 30, side: "both", notes: "",
+            sheetHowTo: [
+                GenerableHowToSection(heading: "Setup", body: "Begin by standing behind a slant board."),
+                GenerableHowToSection(heading: "Starting position", body: "Heels down."),
+            ])
+        let ex = dto.toParsedExercise()
+        XCTAssertEqual(ex.sheetHowTo.map(\.heading), ["Setup", "Starting position"])
+        XCTAssertEqual(ex.sheetHowTo.first?.body, "Begin by standing behind a slant board.")
+        XCTAssertEqual(ex.notes, "", "sheet prose must not reach notes")
+    }
+
+    func test_dtoMapping_dropsEmptySections() {
+        let dto = GenerableExercise(
+            name: "X", reps: 5, sets: 1, durationSec: nil, restSec: 0, side: "both", notes: "",
+            sheetHowTo: [GenerableHowToSection(heading: " ", body: ""),
+                         GenerableHowToSection(heading: "Tip", body: "Keep going.")])
+        XCTAssertEqual(dto.toParsedExercise().sheetHowTo.map(\.heading), ["Tip"])
     }
 
     func test_isAvailable_returnsWithoutCrashing() {
