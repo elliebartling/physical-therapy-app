@@ -59,9 +59,34 @@ final class ExerciseMatcherTests: XCTestCase {
     }
 
     func test_noWideningWhenTheRankerIsUnavailable() async {
-        let m = ExerciseMatcher(ranker: StubRanker(slugs: [], isAvailable: false))
+        let ranker = RecordingRanker(slugs: ["bird-dog"], isAvailable: false)
+        let m = ExerciseMatcher(ranker: ranker)
         let r = await m.match(name: "Quadruped Opposite Arm/Leg Raise", notes: "")
         XCTAssertEqual(r.choice, ArtChoice.none)
+        // Never called, so never handed the whole catalogue.
+        let count = await ranker.lastCandidateCount
+        XCTAssertEqual(count, 0)
+    }
+
+    func test_rankerDecliningOverridesAStrongStageOneMatch() async {
+        // "Bird Dog" scores 1.0 in stage 1; the available ranker still has the last word.
+        let m = ExerciseMatcher(ranker: StubRanker(slugs: []))
+        let r = await m.match(name: "Bird Dog", notes: "")
+        XCTAssertEqual(r.choice, ArtChoice.none)
+        XCTAssertTrue(r.alternatives.isEmpty)
+    }
+
+    func test_cancellationIsNotTurnedIntoAFallbackDecision() async {
+        let m = ExerciseMatcher(ranker: CancellingRanker())
+        let r = await m.match(name: "Bird Dog", notes: "")
+        XCTAssertEqual(r.choice, ArtChoice.unmatched)
+    }
+
+    func test_rankerAlternativesAreCappedAtThree() async {
+        let slugs = ["clamshell", "fire-hydrant", "bird-dog", "glute-bridge", "squat"]
+        let m = ExerciseMatcher(ranker: StubRanker(slugs: slugs))
+        let r = await m.match(name: "Side-Lying Clam", notes: "")
+        XCTAssertEqual(r.alternatives.count, 3)
     }
 
     func test_rankerThrowingFallsBackToStageOne() async {
@@ -73,8 +98,48 @@ final class ExerciseMatcherTests: XCTestCase {
     func test_slugNotInShortlistIsDiscarded() async {
         let m = ExerciseMatcher(ranker: StubRanker(slugs: ["totally-made-up"]))
         let r = await m.match(name: "Bird Dog", notes: "")
-        XCTAssertNotEqual(r.choice, ArtChoice.library(slug: "totally-made-up"))
+        // Nothing usable from the ranker: stage 1 decides, and "Bird Dog" clears the floor.
+        XCTAssertEqual(r.choice, ArtChoice.library(slug: "bird-dog"))
         XCTAssertFalse(r.alternatives.contains("totally-made-up"))
+    }
+
+    func test_unusableRankerAnswerCannotShipBelowTheFloor() async {
+        let m = ExerciseMatcher(ranker: StubRanker(slugs: ["totally-made-up"]))
+        let r = await m.match(name: "Slant Board Gastrocnemius Stretch", notes: "")
+        XCTAssertEqual(r.choice, ArtChoice.none)
+    }
+
+    func test_modelNumbersMapBackToSlugsAndOutOfRangeIsDropped() throws {
+        let catalog = ExerciseCatalog.bundled.entries
+        let candidates = catalog.prefix(5).map { ScoredCandidate(entry: $0, score: 0) }
+        let ranking = GenerableRanking(reasoning: "", verdict: .same, choices: [3, 99, 0, 1])
+        let slugs = try FoundationModelsRanker.slugs(from: ranking, candidates: candidates)
+        XCTAssertEqual(slugs, [candidates[2].entry.slug, candidates[0].entry.slug])
+    }
+
+    func test_modelNoneVerdictIgnoresNumbers() throws {
+        let candidates = ExerciseCatalog.bundled.entries.prefix(5).map { ScoredCandidate(entry: $0, score: 0) }
+        let ranking = GenerableRanking(reasoning: "", verdict: .none, choices: [1])
+        XCTAssertEqual(try FoundationModelsRanker.slugs(from: ranking, candidates: candidates), [])
+    }
+
+    func test_modelSameWithOnlyOutOfRangeNumbersFails() {
+        let candidates = ExerciseCatalog.bundled.entries.prefix(5).map { ScoredCandidate(entry: $0, score: 0) }
+        let ranking = GenerableRanking(reasoning: "", verdict: .same, choices: [42])
+        XCTAssertThrowsError(try FoundationModelsRanker.slugs(from: ranking, candidates: candidates))
+    }
+
+    func test_widenedPromptStaysSmallAndNotesAreCapped() {
+        let all = ExerciseCatalog.bundled.entries.map { ScoredCandidate(entry: $0, score: 0) }
+        let prompt = FoundationModelsRanker.prompt(
+            name: "Quadruped Opposite Arm/Leg Raise",
+            notes: String(repeating: "n", count: 5000),
+            candidates: all
+        )
+        print("WIDENED_PROMPT_CHARS=\(prompt.count) INSTRUCTIONS_CHARS=\(FoundationModelsRanker.instructions.count)")
+        XCTAssertLessThan(prompt.count, 7000)
+        XCTAssertFalse(prompt.contains(String(repeating: "n", count: 201)))
+        XCTAssertTrue(prompt.contains("142 |"))
     }
 
     func test_discardedSlugsDoNotPoisonValidOnes() async {
@@ -82,5 +147,13 @@ final class ExerciseMatcherTests: XCTestCase {
         let r = await m.match(name: "Bird Dog", notes: "")
         XCTAssertEqual(r.choice, ArtChoice.library(slug: "bird-dog"))
         XCTAssertTrue(r.alternatives.isEmpty)
+    }
+}
+
+/// Always reports cancellation.
+struct CancellingRanker: CandidateRanker {
+    let isAvailable = true
+    func rank(name: String, notes: String, candidates: [ScoredCandidate]) async throws -> [String] {
+        throw CancellationError()
     }
 }

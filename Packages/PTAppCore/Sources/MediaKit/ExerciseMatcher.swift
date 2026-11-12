@@ -67,9 +67,15 @@ public struct ExerciseMatcher: Sendable {
             if let result = await ranked(name: name, notes: notes, candidates: candidates) {
                 return result
             }
+            // A cancelled task must not quietly produce a decision.
+            if Task.isCancelled { return Self.cancelled }
         }
         return stageOne(shortlist)
     }
+
+    /// Returned when the task was cancelled: nothing was decided, so nothing
+    /// should be stored as a decision.
+    private static let cancelled = MatchResult(choice: ArtChoice.unmatched, alternatives: [])
 
     private func isWeak(_ shortlist: [ScoredCandidate]) -> Bool {
         guard let top = shortlist.first else { return true }
@@ -92,6 +98,8 @@ public struct ExerciseMatcher: Sendable {
         let slugs: [String]
         do {
             slugs = try await ranker.rank(name: name, notes: notes, candidates: candidates)
+        } catch is CancellationError {
+            return Self.cancelled
         } catch {
             logger.error("Ranker failed, using stage 1: \(error.localizedDescription, privacy: .public)")
             return nil
@@ -161,10 +169,11 @@ public actor RecordingRanker: CandidateRanker {
     private let slugs: [String]
     public private(set) var lastCandidateCount = 0
 
-    public nonisolated var isAvailable: Bool { true }
+    public nonisolated let isAvailable: Bool
 
-    public init(slugs: [String]) {
+    public init(slugs: [String], isAvailable: Bool = true) {
         self.slugs = slugs
+        self.isAvailable = isAvailable
     }
 
     public func rank(name: String, notes: String, candidates: [ScoredCandidate]) async throws -> [String] {
