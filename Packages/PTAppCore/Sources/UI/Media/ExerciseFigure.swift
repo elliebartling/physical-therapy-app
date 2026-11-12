@@ -20,15 +20,18 @@ public struct ExerciseFigure: View {
     private let art: ArtChoice
     private let frame: Int
     private let explicitStore: ArtStore?
+    private let onLoad: ((Bool) -> Void)?
 
     @Environment(\.artStore) private var environmentStore
     @State private var image: UIImage?
     @State private var loadedKey: LoadKey?
 
-    public init(art: ArtChoice, frame: Int = 1, store: ArtStore? = nil) {
+    /// `onLoad` reports whether a load finished with a picture; nil keeps the figure silent.
+    public init(art: ArtChoice, frame: Int = 1, store: ArtStore? = nil, onLoad: ((Bool) -> Void)? = nil) {
         self.art = art
         self.frame = frame
         self.explicitStore = store
+        self.onLoad = onLoad
     }
 
     struct LoadKey: Equatable {
@@ -68,6 +71,7 @@ public struct ExerciseFigure: View {
         let loaded = await Self.loadImage(slug: key.slug, frame: key.frame, store: store)
         guard !Task.isCancelled else { return }
         image = loaded
+        onLoad?(loaded != nil)
     }
 }
 

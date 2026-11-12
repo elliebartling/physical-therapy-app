@@ -14,8 +14,8 @@ final class ExerciseIllustrationTests: XCTestCase {
         XCTAssertEqual(ExerciseIllustration.clamped(9), 3)
     }
 
-    func test_withAPicture_showsScrubAndCredit() throws {
-        let sut = ExerciseIllustration(art: .library(slug: "bird-dog"))
+    func test_afterAFrameLoads_showsScrubAndCredit() throws {
+        let sut = ExerciseIllustration(art: .library(slug: "bird-dog"), hasLoadedPicture: true)
         let texts = try sut.inspect().findAll(ViewType.Text.self).map { try $0.string() }
         XCTAssertTrue(texts.contains(Self.credit))
         XCTAssertNoThrow(try sut.inspect().find(ViewType.Picker.self))
@@ -27,5 +27,11 @@ final class ExerciseIllustrationTests: XCTestCase {
             XCTAssertThrowsError(try sut.inspect().find(text: Self.credit), "\(art)")
             XCTAssertThrowsError(try sut.inspect().find(ViewType.Picker.self), "\(art)")
         }
+    }
+
+    func test_beforeAnyFrameLoads_catalogueKnownSlugShowsNeitherScrubNorCredit() throws {
+        let sut = ExerciseIllustration(art: .library(slug: "bird-dog"))
+        XCTAssertThrowsError(try sut.inspect().find(text: Self.credit))
+        XCTAssertThrowsError(try sut.inspect().find(ViewType.Picker.self))
     }
 }
