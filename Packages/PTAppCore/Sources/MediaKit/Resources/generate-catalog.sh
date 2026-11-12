@@ -6,6 +6,7 @@ set -eu
 
 URL="https://cdn.jsdelivr.net/npm/@bryllim/workout-guide@1.0.0/manifest.json"
 OUT="$(cd "$(dirname "$0")" && pwd)/catalog.json"
+trap 'rm -f "$OUT.tmp"' EXIT
 
 curl -fsSL "$URL" | python3 -I -c '
 import json, sys
@@ -18,6 +19,8 @@ FIELDS = ("slug", "name", "equipment", "primaryMuscle", "secondaryMuscles", "isS
 
 manifest = json.load(sys.stdin)
 entries = [{k: e[k] for k in FIELDS} for e in manifest if e["equipment"] in KEEP]
+if not entries:
+    sys.exit("no entries matched — upstream schema changed")
 json.dump(entries, sys.stdout, indent=2, ensure_ascii=False)
 sys.stdout.write("\n")
 ' > "$OUT.tmp"

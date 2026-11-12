@@ -7,6 +7,8 @@ import ParsingKit
 public final class RoutineEditorViewModel {
     public var name: String
     public var exercises: [ParsedRoutine.ParsedExercise]
+    /// The import's matcher output per exercise id; empty for a saved routine.
+    var importedSuggestions: [UUID: ImportedSuggestions] = [:]
 
     public init(name: String, exercises: [ParsedRoutine.ParsedExercise]) {
         self.name = name

@@ -23,7 +23,7 @@ final class ArtChoiceTests: XCTestCase {
         e.art = .library(slug: "bird-dog")
         XCTAssertEqual(e.art, .library(slug: "bird-dog"))
         e.art = .none
-        XCTAssertEqual(e.art, .none)
+        XCTAssertEqual(e.art, ArtChoice.none)
     }
 
     func test_codableUsesRawString() throws {

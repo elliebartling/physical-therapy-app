@@ -49,18 +49,6 @@ public actor ArtStore {
         return await task.value
     }
 
-    /// Warms the cache for these exercises. Failures are fine; they retry
-    /// the next time a frame is asked for.
-    public func prefetch(slugs: [String]) async {
-        await withTaskGroup(of: Void.self) { group in
-            for slug in slugs {
-                for n in Self.frameRange {
-                    group.addTask { [self] in _ = await frame(slug: slug, frame: n) }
-                }
-            }
-        }
-    }
-
     private func finish(_ key: String) {
         inFlight[key] = nil
     }

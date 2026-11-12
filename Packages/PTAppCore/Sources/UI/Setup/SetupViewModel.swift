@@ -42,7 +42,11 @@ public final class SetupViewModel {
         routineRepo: RoutineRepository,
         parser: RoutineParser = .init(),
         matcher: ExerciseMatcher = .init(),
-        matchTimeout: Duration = .seconds(5)
+        // Provisional: no on-device measurement yet. One inference per exercise, effectively
+        // serialised, each with a ~6.2 KB widened prompt. Exceeding it leaves exercises
+        // `.unmatched` (retryable from the picker). If it proves too slow, batch into one
+        // call or fill matches in after the editor appears; don't keep raising this.
+        matchTimeout: Duration = .seconds(20)
     ) {
         self.routineRepo = routineRepo
         self.parser = parser
@@ -156,9 +160,12 @@ public final class SetupViewModel {
     ) async {
         do {
             var parsed = try await work()
-            parsed.exercises = await withSuggestedArt(parsed.exercises)
+            let (exercises, imported) = await withSuggestedArt(parsed.exercises)
+            parsed.exercises = exercises
             draft = parsed
-            editorVM = RoutineEditorViewModel(parsed: parsed)
+            let editor = RoutineEditorViewModel(parsed: parsed)
+            editor.importedSuggestions = imported
+            editorVM = editor
             phase = .editing
         } catch {
             draft = .init(name: "My routine", exercises: [])
@@ -174,7 +181,7 @@ public final class SetupViewModel {
     }
 
     private enum MatchEvent: Sendable {
-        case matched(Int, ArtChoice)
+        case matched(Int, MatchResult)
         case timedOut
         case cancelled
     }
@@ -184,17 +191,17 @@ public final class SetupViewModel {
     /// retry is still possible) and the exercises keep their order.
     private func withSuggestedArt(
         _ exercises: [ParsedRoutine.ParsedExercise]
-    ) async -> [ParsedRoutine.ParsedExercise] {
-        guard !exercises.isEmpty else { return exercises }
+    ) async -> ([ParsedRoutine.ParsedExercise], [UUID: ImportedSuggestions]) {
+        guard !exercises.isEmpty else { return (exercises, [:]) }
         let matcher = matcher
         let timeout = matchTimeout
         let requests = exercises.enumerated().map { (index: $0.offset, name: $0.element.name, notes: $0.element.notes) }
 
-        let choices: [Int: ArtChoice] = await withTaskGroup(of: MatchEvent.self) { group in
+        let results: [Int: MatchResult] = await withTaskGroup(of: MatchEvent.self) { group in
             for request in requests {
                 group.addTask {
                     let result = await matcher.match(name: request.name, notes: request.notes)
-                    return .matched(request.index, result.choice)
+                    return .matched(request.index, result)
                 }
             }
             group.addTask {
@@ -202,12 +209,12 @@ public final class SetupViewModel {
                 do { try await Task.sleep(for: timeout) } catch { return .cancelled }
                 return .timedOut
             }
-            var found: [Int: ArtChoice] = [:]
+            var found: [Int: MatchResult] = [:]
             var pending = requests.count
             loop: while pending > 0, let event = await group.next() {
                 switch event {
-                case .matched(let index, let choice):
-                    found[index] = choice
+                case .matched(let index, let result):
+                    found[index] = result
                     pending -= 1
                 case .timedOut:
                     logger.error("Picture matching timed out; leaving the rest unmatched")
@@ -221,9 +228,12 @@ public final class SetupViewModel {
         }
 
         var matched = exercises
-        for (index, choice) in choices where matched.indices.contains(index) && matched[index].art == .unmatched {
-            matched[index].art = choice
+        var imported: [UUID: ImportedSuggestions] = [:]
+        for (index, result) in results where matched.indices.contains(index) && matched[index].art == .unmatched {
+            matched[index].art = result.choice
+            imported[matched[index].id] = ImportedSuggestions(
+                name: matched[index].name, notes: matched[index].notes, result: result)
         }
-        return matched
+        return (matched, imported)
     }
 }

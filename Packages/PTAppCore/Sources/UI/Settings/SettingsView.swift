@@ -1,4 +1,5 @@
 import SwiftUI
+import MediaKit
 
 public struct SettingsView: View {
     @Bindable public var viewModel: SettingsViewModel
@@ -72,7 +73,7 @@ private struct CreditsSection: View {
 
     var body: some View {
         Section("Credits") {
-            Text(ExerciseIllustration.credit)
+            Text(ArtSource.credit)
                 .font(.footnote)
                 .foregroundStyle(AppColor.inkSecondary)
             if let licence = Self.licence {

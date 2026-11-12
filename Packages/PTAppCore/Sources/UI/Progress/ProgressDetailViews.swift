@@ -9,7 +9,7 @@ struct ExerciseProgressView: View {
         ScrollView {
             if let row = viewModel.exercise(id: exerciseID) {
                 VStack(alignment: .leading, spacing: 0) {
-                    ExerciseIllustration(art: row.art).padding(.bottom, 20)
+                    ExerciseIllustration(art: row.art)
                     Text(row.name)
                         .font(AppFont.display(30, weight: .bold))
                         .tracking(-1)
@@ -18,7 +18,7 @@ struct ExerciseProgressView: View {
                         .font(AppFont.mono(13))
                         .foregroundStyle(AppColor.inkSecondary)
                         .padding(.top, 6)
-                    SheetHowToView(sections: row.sheetHowTo).padding(.top, 20)
+                    SheetHowToView(sections: row.sheetHowTo)
                     figures(row).padding(.top, 24)
                     timeline.padding(.top, 28)
                 }

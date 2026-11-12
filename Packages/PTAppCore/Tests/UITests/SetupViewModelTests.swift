@@ -238,6 +238,18 @@ final class SetupViewModelTests: XCTestCase {
         return file
     }
 
+    func test_parseKeepsTheMatchersAlternativesForThePicker() async throws {
+        let (vm, container) = try makeVM(twoExercises, ranker: StubRanker(slugs: ["bird-dog"]))
+        await vm.parse(transcript: "Bird dog and cat cow")
+        let editor = try XCTUnwrap(vm.editorVM)
+        for ex in editor.exercises {
+            let kept = try XCTUnwrap(editor.importedSuggestions[ex.id])
+            XCTAssertEqual(kept.name, ex.name)
+            XCTAssertEqual(kept.result.choice, ex.art)
+        }
+        _ = container
+    }
+
     func test_parseAssignsArtToEveryDraftExercise() async throws {
         // StubRanker answers "bird-dog" for both, but the matcher discards slugs outside the
         // shortlist it offered, so "Cat cow" gets nothing usable from the ranker and falls

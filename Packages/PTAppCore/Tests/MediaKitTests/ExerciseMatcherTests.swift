@@ -93,7 +93,7 @@ final class ExerciseMatcherTests: XCTestCase {
     }
 
     func test_rankerAlternativesAreCappedAtThree() async {
-        let slugs = ["clamshell", "fire-hydrant", "bird-dog", "glute-bridge", "squat"]
+        let slugs = ["clamshell", "fire-hydrant", "bird-dog", "glute-bridge", "dead-bug"]
         // A threshold above any score always widens, so every slug is a candidate
         // whatever the scorer does.
         let m = ExerciseMatcher(ranker: StubRanker(slugs: slugs), wideningThreshold: 2)

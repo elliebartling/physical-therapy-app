@@ -8,7 +8,6 @@ import MediaKit
 /// Renders nothing when there is no picture to show, so no empty square and
 /// no credit for an illustration that is not there.
 struct ExerciseIllustration: View {
-    static let credit = "Exercise illustrations by Bryl Lim, licensed CC BY-SA 4.0. Derived from Everkinetic."
     static let frames = 1...3
 
     let art: ArtChoice
@@ -48,6 +47,8 @@ struct ExerciseIllustration: View {
                     credit
                 }
             }
+            // Inside the conditional, so no picture means no dead space either.
+            .padding(.bottom, 20)
             .onChange(of: art) {
                 hasLoadedPicture = false
                 frame = 1
@@ -56,8 +57,8 @@ struct ExerciseIllustration: View {
     }
 
     private var credit: some View {
-        Text(Self.credit)
-            .font(Font.custom("JetBrainsMono-Regular", size: 10, relativeTo: .caption2))
+        Text(ArtSource.credit)
+            .font(AppFont.scalingMono(10, relativeTo: .caption2))
             .foregroundStyle(AppColor.inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }

@@ -119,6 +119,15 @@ final class ArtPickerViewTests: XCTestCase {
         }))
     }
 
+    func test_importedSuggestionsAreServedOnlyWhileNameAndNotesMatch() {
+        let imported = ImportedSuggestions(name: "Bird Dog", notes: "slow",
+                                           result: MatchResult(choice: .library(slug: "bird-dog"),
+                                                               alternatives: ["dead-bug"]))
+        XCTAssertEqual(imported.entries(forName: "Bird Dog", notes: "slow").map(\.slug), ["bird-dog", "dead-bug"])
+        XCTAssertTrue(imported.entries(forName: "Bird Dog (left)", notes: "slow").isEmpty)
+        XCTAssertTrue(imported.entries(forName: "Bird Dog", notes: "").isEmpty)
+    }
+
     /// A pin: a new exercise is `.unmatched` (retryable), never `.none`.
     func test_addExerciseStartsUnmatched() {
         let vm = RoutineEditorViewModel(name: "R", exercises: [])

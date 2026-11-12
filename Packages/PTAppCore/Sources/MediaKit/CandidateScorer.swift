@@ -35,6 +35,9 @@ public struct CandidateScorer: Sendable {
     private let weights: [String: Double]
     private let unknownWeight: Double
 
+    /// Built once: indexing the whole catalogue is not free, and views create matchers freely.
+    public static let bundled = CandidateScorer()
+
     public init(catalog: ExerciseCatalog = .bundled) {
         let indexed = catalog.entries.map {
             Indexed(entry: $0, tokens: Set(Self.tokens(in: $0.name)))

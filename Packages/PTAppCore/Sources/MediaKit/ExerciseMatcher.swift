@@ -46,7 +46,7 @@ public struct ExerciseMatcher: Sendable {
     private let wideningThreshold: Double
 
     public init(
-        scorer: CandidateScorer = .init(),
+        scorer: CandidateScorer = .bundled,
         catalog: ExerciseCatalog = .bundled,
         ranker: any CandidateRanker = FoundationModelsRanker(),
         floor: Double = 0.45,

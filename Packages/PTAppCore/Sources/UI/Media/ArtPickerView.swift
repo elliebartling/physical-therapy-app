@@ -2,24 +2,44 @@ import SwiftUI
 import DataKit
 import MediaKit
 
+/// What the import-time matcher said about one exercise, remembered with the
+/// name and notes it was asked about so a later rename is not served stale
+/// suggestions.
+///
+/// Import-review path only. The alternatives are not stored with a saved
+/// routine, so after save the picker re-matching on demand is the (correct,
+/// documented) recovery path.
+struct ImportedSuggestions: Sendable, Equatable {
+    let name: String
+    let notes: String
+    let result: MatchResult
+
+    func entries(forName name: String, notes: String) -> [CatalogEntry] {
+        guard name == self.name, notes == self.notes else { return [] }
+        return ArtPickerView.suggestions(from: result)
+    }
+}
+
 /// Chooses the picture for one exercise.
 ///
 /// Reached from `ExerciseEditorView`, which both the post-import review and
 /// the saved-routine editor use, so this one screen is how a picture is
 /// corrected at either moment. Suggestions come from re-running the matcher
 /// on demand; "No picture" is always on offer, even before they arrive.
-public struct ArtPickerView: View {
+struct ArtPickerView: View {
     @Binding private var art: ArtChoice
     private let exerciseName: String
     private let matcher: ExerciseMatcher
     let notes: String
 
     @State private var suggestions: [CatalogEntry]
+    /// Opened with the import's suggestions, so the first load needs no second inference.
+    private let isSeeded: Bool
     @State private var hasLoaded = false
     @Environment(\.dismiss) private var dismiss
 
-    public init(art: Binding<ArtChoice>, exerciseName: String, notes: String = "",
-                matcher: ExerciseMatcher = .init()) {
+    init(art: Binding<ArtChoice>, exerciseName: String, notes: String = "",
+         matcher: ExerciseMatcher = .init()) {
         self.init(art: art, exerciseName: exerciseName, notes: notes, matcher: matcher,
                   initialSuggestions: [])
     }
@@ -31,6 +51,7 @@ public struct ArtPickerView: View {
         self.notes = notes
         self.matcher = matcher
         self._suggestions = State(initialValue: initialSuggestions)
+        self.isSeeded = !initialSuggestions.isEmpty
     }
 
     private struct LoadKey: Equatable {
@@ -80,7 +101,7 @@ public struct ArtPickerView: View {
         Self.displayedEntries(current: art, suggestions: suggestions)
     }
 
-    public var body: some View {
+    var body: some View {
         List {
             if !entries.isEmpty {
                 Section {
@@ -107,6 +128,10 @@ public struct ArtPickerView: View {
         .navigationTitle("Picture")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: LoadKey(name: exerciseName, notes: notes)) {
+            if isSeeded && !hasLoaded {
+                hasLoaded = true
+                return
+            }
             let loaded = await Self.loadSuggestions(name: exerciseName, notes: notes, matcher: matcher)
             guard !Task.isCancelled else { return }
             suggestions = loaded

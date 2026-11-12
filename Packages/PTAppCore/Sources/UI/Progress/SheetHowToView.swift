@@ -13,6 +13,8 @@ struct SheetHowToView: View {
                     block(section)
                 }
             }
+            // Inside the conditional, so an empty list leaves no gap.
+            .padding(.top, 20)
         }
     }
 

@@ -59,6 +59,8 @@ final class ArtStoreTests: XCTestCase {
         // while it is in flight. Without dedup each would start its own.
         let dl = StubFrameDownloader(holdFirstCall: true)
         let store = ArtStore(downloader: dl, directory: tempDir())
+        // A slug that left the catalogue would fail every call and the wait below would spin forever.
+        XCTAssertNotNil(ExerciseCatalog.bundled.entry(slug: "dead-bug"))
         let results = await withTaskGroup(of: Data?.self) { g -> [Data?] in
             for _ in 0..<8 { g.addTask { await store.frame(slug: "dead-bug", frame: 1) } }
             while await dl.callCount == 0 { await Task.yield() }
@@ -118,14 +120,6 @@ final class ArtStoreTests: XCTestCase {
         let result = await store.frame(slug: "bird-dog", frame: 2)
         XCTAssertNotNil(result)
         XCTAssertTrue(FileManager.default.fileExists(atPath: dir.path))
-    }
-
-    func test_prefetchFetchesEveryFrameOfEachSlug() async {
-        let dl = StubFrameDownloader()
-        let store = ArtStore(downloader: dl, directory: tempDir())
-        await store.prefetch(slugs: ["bird-dog", "clamshell"])
-        let calls = await dl.callCount
-        XCTAssertEqual(calls, 6)
     }
 
     func test_cdnURLShape() {

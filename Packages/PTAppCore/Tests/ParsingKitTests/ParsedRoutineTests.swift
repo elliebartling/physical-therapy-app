@@ -21,10 +21,10 @@ final class ParsedRoutineTests: XCTestCase {
             .init(name: "Bird Dog", reps: 10, sets: 3, durationSec: nil, restSec: 30,
                   side: "both", notes: "", art: .library(slug: "bird-dog")),
             .init(name: "Mystery", reps: 10, sets: 3, durationSec: nil, restSec: 30,
-                  side: "both", notes: "", art: .none),
+                  side: "both", notes: "", art: ArtChoice.none),
         ])
         XCTAssertEqual(parsed.toRoutine().orderedExercises.map(\.art),
-                       [.library(slug: "bird-dog"), .none])
+                       [.library(slug: "bird-dog"), ArtChoice.none])
     }
 
     func test_decodingWithoutArtDefaultsToUnmatched() throws {

@@ -237,9 +237,19 @@ Flagged so they can be overridden cheaply.
   adds a second `FoundationModels` import; the comment in
   `FoundationModelsExtractor.swift` claiming it is the only such file needs
   updating.
-- **Matching runs during import, batched** — one model call for the routine
-  rather than one per exercise, so suggestions are ready when the review screen
-  appears and the prior spec's two-minute first-session target survives.
+- **Matching runs during import, one call per exercise.**
+  `SetupViewModel.withSuggestedArt` fans out one `matcher.match` per exercise in
+  a task group, each stage-2 call building its own `LanguageModelSession`, so
+  suggestions are ready when the review screen appears. (An earlier draft of this
+  spec said "batched, one model call for the routine"; that is not what was
+  built.) On-device inference is effectively serialised, so N exercises means N
+  sequential inferences, each carrying a prompt measured at ~6.2 KB when
+  widened. `matchTimeout` (provisionally 20 s) must be derived from that total,
+  not from a single call. Exercises that miss the deadline stay `.unmatched`
+  (retryable from the picker). If it proves too slow, the fix is to batch into
+  one call or fill matches in after the editor appears, not a bigger timeout.
+  The import's alternatives are carried into the picker so it need not re-match
+  on the review path; after save, the picker re-matches on demand.
 - **An unconfirmed guess reads as a guess** in the review step only; once saved
   it is just the picture.
 - **Attribution screen in Settings**, linked from the exercise screen.

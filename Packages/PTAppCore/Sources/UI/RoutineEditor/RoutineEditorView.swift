@@ -28,7 +28,7 @@ public struct RoutineEditorView: View {
                 }
                 Section("Exercises") {
                     ForEach($viewModel.exercises, id: \.id) { $ex in
-                        NavigationLink(destination: ExerciseEditorView(exercise: $ex)) {
+                        NavigationLink(destination: ExerciseEditorView(exercise: $ex, imported: viewModel.importedSuggestions[ex.id])) {
                             ExerciseSummaryRow(name: ex.name, summary: summary(for: ex), art: ex.art)
                         }
                     }
