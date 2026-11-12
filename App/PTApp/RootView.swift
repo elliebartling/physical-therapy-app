@@ -10,6 +10,7 @@ struct RootView: View {
     @State private var route: Route = .home
     @State private var tab: HomeTab = .today
     @State private var lastStreak: Int = 0
+    @State private var finishedSession: SessionRecord?
 
     @AppStorage(AccentChoice.storageKey) private var accentRaw = AccentChoice.signal.rawValue
     @Environment(\.modelContext) private var modelContext
@@ -55,7 +56,8 @@ struct RootView: View {
                 if let routine = try? routineRepo.fetchActive() {
                     SessionView(
                         viewModel: SessionViewModel(routine: routine, sessionRepo: sessionRepo),
-                        onComplete: {
+                        onComplete: { record in
+                            finishedSession = record
                             let sessions = (try? sessionRepo.fetchAll()) ?? []
                             lastStreak = StreakCalculator.currentStreak(in: sessions, today: .now)
                             route = .complete
@@ -66,7 +68,17 @@ struct RootView: View {
                     Text("No routine").onAppear { route = .home }
                 }
             case .complete:
-                SessionCompleteView(newStreak: lastStreak) { route = .home }
+                SessionCompleteView(
+                    newStreak: lastStreak,
+                    summary: finishedSession.map {
+                        SessionSummaryViewModel(record: $0, routine: try? routineRepo.fetchActive(),
+                                                sessionRepo: sessionRepo)
+                    },
+                    onDone: {
+                        finishedSession = nil
+                        route = .home
+                    }
+                )
             case .settings:
                 SettingsView(
                     viewModel: SettingsViewModel(),

@@ -15,12 +15,15 @@ public final class ProgressViewModel {
         public let name: String
         public let prescription: String
         public let stats: ExerciseStats
+        /// The most recent rating it was given, if any.
+        public let lastRating: ExerciseRating?
     }
 
     public struct SessionItem: Identifiable, Equatable {
         public let id: UUID
         public let name: String
         public let isDone: Bool
+        public let rating: ExerciseRating?
     }
 
     public struct SessionRow: Identifiable, Equatable {
@@ -30,6 +33,8 @@ public final class ProgressViewModel {
         /// Timed in the app; nil for a session logged afterwards.
         public let minutes: Int?
         public let items: [SessionItem]
+        public let painLevel: Int?
+        public let note: String?
         public var doneCount: Int { items.filter(\.isDone).count }
     }
 
@@ -44,6 +49,7 @@ public final class ProgressViewModel {
         public let id: UUID
         public let date: Date
         public let isDone: Bool
+        public let rating: ExerciseRating?
     }
 
     public static let weeksShown = 8
@@ -93,7 +99,8 @@ public final class ProgressViewModel {
         return sessions
             .flatMap(\.exerciseRecords)
             .filter { (lineage[$0.exerciseID] ?? $0.exerciseID) == group }
-            .map { ExerciseEntry(id: $0.id, date: $0.completedAt ?? $0.startedAt, isDone: $0.status == .completed) }
+            .map { ExerciseEntry(id: $0.id, date: $0.completedAt ?? $0.startedAt,
+                                 isDone: $0.status == .completed, rating: $0.rating) }
             .sorted { $0.date > $1.date }
     }
 
@@ -137,7 +144,8 @@ public final class ProgressViewModel {
             ExerciseRow(id: exercise.id,
                         name: exercise.name,
                         prescription: Prescription.text(target: exercise.target, side: exercise.side),
-                        stats: stats[exercise.lineageID] ?? ExerciseStats())
+                        stats: stats[exercise.lineageID] ?? ExerciseStats(),
+                        lastRating: entries(forExercise: exercise.id).first(where: { $0.rating != nil })?.rating)
         }
 
         let rows = sessions.sorted { $0.startedAt > $1.startedAt }.map(row(for:))
@@ -166,9 +174,11 @@ public final class ProgressViewModel {
             .map { record in
                 SessionItem(id: record.id,
                             name: names[record.exerciseID] ?? "Removed exercise",
-                            isDone: record.status == .completed)
+                            isDone: record.status == .completed,
+                            rating: record.rating)
             }
         return SessionRow(id: session.id, date: session.startedAt,
-                          isComplete: session.isComplete, minutes: minutes, items: items)
+                          isComplete: session.isComplete, minutes: minutes, items: items,
+                          painLevel: session.painLevel, note: session.note)
     }
 }

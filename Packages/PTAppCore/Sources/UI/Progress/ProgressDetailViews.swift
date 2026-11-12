@@ -55,6 +55,12 @@ struct ExerciseProgressView: View {
                     Text(entry.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
                         .font(AppFont.body(15))
                     Spacer()
+                    if let rating = entry.rating {
+                        Text(rating.title.uppercased())
+                            .font(AppFont.mono(11, weight: .medium))
+                            .tracking(0.5)
+                            .foregroundStyle(AppColor.inkSecondary)
+                    }
                     Label(entry.isDone ? "Done" : "Skipped",
                           systemImage: entry.isDone ? "checkmark.circle.fill" : "minus.circle")
                         .font(AppFont.mono(12, weight: .medium))
@@ -110,6 +116,9 @@ struct SessionDetailView: View {
                         .foregroundStyle(AppColor.inkSecondary)
                         .padding(.top, 6)
                     exercises(row).padding(.top, 24)
+                    if row.painLevel != nil || row.note != nil {
+                        notes(row).padding(.top, 24)
+                    }
                     deleteButton.padding(.top, 32)
                 }
                 .padding(.horizontal, AppSpacing.screenPadding)
@@ -148,12 +157,41 @@ struct SessionDetailView: View {
                         .font(AppFont.display(16, weight: .medium))
                         .foregroundStyle(item.isDone ? AppColor.ink : AppColor.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: 8)
+                    if let rating = item.rating {
+                        Text(rating.title.uppercased())
+                            .font(AppFont.mono(11, weight: .medium))
+                            .tracking(0.5)
+                            .foregroundStyle(AppColor.inkSecondary)
+                    }
                 }
                 .padding(.vertical, 11)
                 .overlay(alignment: .top) { HairlineDivider() }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(item.name), \(item.isDone ? "done" : "skipped")")
+                .accessibilityLabel([item.name, item.isDone ? "done" : "skipped", item.rating?.title]
+                    .compactMap { $0 }.joined(separator: ", "))
+            }
+        }
+    }
+
+    private func notes(_ row: ProgressViewModel.SessionRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            InkRule()
+            if let pain = row.painLevel {
+                HStack {
+                    SectionLabel("Pain")
+                    Spacer()
+                    Text("\(pain) / 10")
+                        .font(AppFont.mono(13, weight: .medium))
+                }
+                .padding(.top, 10)
+                .accessibilityElement(children: .combine)
+            }
+            if let note = row.note {
+                SectionLabel("Note").padding(.top, 10)
+                Text(note)
+                    .font(AppFont.body(15))
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

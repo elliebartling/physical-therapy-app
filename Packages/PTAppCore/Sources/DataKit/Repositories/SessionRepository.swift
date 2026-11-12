@@ -14,6 +14,11 @@ public final class SessionRepository {
         try context.save()
     }
 
+    /// Saves changes made to sessions already stored, e.g. ratings added afterwards.
+    public func saveChanges() throws {
+        try context.save()
+    }
+
     /// Removes a session and its exercise records, e.g. one logged by mistake.
     public func delete(_ record: SessionRecord) throws {
         context.delete(record)

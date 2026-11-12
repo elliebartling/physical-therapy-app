@@ -6,6 +6,7 @@ public struct SettingsView: View {
     public var onDone: () -> Void
 
     @AppStorage(AccentChoice.storageKey) private var accentRaw = AccentChoice.signal.rawValue
+    @AppStorage(RatingTiming.storageKey) private var ratingTiming = RatingTiming.atEnd
 
     public init(viewModel: SettingsViewModel,
                 onReplaceRoutine: @escaping () -> Void,
@@ -30,6 +31,16 @@ public struct SettingsView: View {
                 }
                 .onChange(of: viewModel.reminderEnabled) { _, _ in Task { await viewModel.applyReminder() } }
                 .onChange(of: viewModel.reminderTime) { _, _ in Task { await viewModel.applyReminder() } }
+
+                Section {
+                    Picker("Rate exercises", selection: $ratingTiming) {
+                        ForEach(RatingTiming.allCases) { Text($0.title).tag($0) }
+                    }
+                } header: {
+                    Text("Ratings")
+                } footer: {
+                    Text("Easy, about right, hard or painful — always optional. At the end, you can also note pain and anything for your PT.")
+                }
 
                 HealthSettingsSection(viewModel: viewModel)
 

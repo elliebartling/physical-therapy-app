@@ -4,13 +4,16 @@ import DataKit
 
 public struct SessionView: View {
     @Bindable public var viewModel: SessionViewModel
-    public var onComplete: () -> Void
+    /// Called with the finished session's record, for the summary.
+    public var onComplete: (SessionRecord) -> Void
     public var onEnd: () -> Void
 
     @State private var confirmingEnd = false
     @Environment(\.appAccent) private var accent
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(viewModel: SessionViewModel, onComplete: @escaping () -> Void, onEnd: @escaping () -> Void = {}) {
+    public init(viewModel: SessionViewModel, onComplete: @escaping (SessionRecord) -> Void,
+                onEnd: @escaping () -> Void = {}) {
         self.viewModel = viewModel
         self.onComplete = onComplete
         self.onEnd = onEnd
@@ -32,6 +35,13 @@ public struct SessionView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     header
                     titleBlock.padding(.top, 26)
+                    if let prompt = viewModel.ratingPrompt {
+                        RatingPromptCard(exerciseName: prompt.exerciseName,
+                                         onRate: { viewModel.rate($0) },
+                                         onDismiss: { viewModel.dismissRatingPrompt() })
+                            .padding(.top, 18)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                     Spacer(minLength: AppSpacing.s(2))
                     BigReading(reading: reading)
                     controls.padding(.top, AppSpacing.s(3))
@@ -42,10 +52,21 @@ public struct SessionView: View {
         }
         .foregroundStyle(AppColor.ink)
         .opacity(viewModel.isComplete ? 0 : 1)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: viewModel.ratingPrompt)
         .task { await viewModel.run() }
+        .task(id: viewModel.ratingPrompt?.id) {
+            // An unanswered rating goes away on its own; it's always optional.
+            guard viewModel.ratingPrompt != nil else { return }
+            do {
+                try await Task.sleep(for: .seconds(8))
+                viewModel.dismissRatingPrompt()
+            } catch {
+                // Replaced by a newer prompt, or the view went away.
+            }
+        }
         .onChange(of: viewModel.isComplete) { _, complete in
             guard complete else { return }
-            viewModel.endedEarly ? onEnd() : onComplete()
+            viewModel.endedEarly ? onEnd() : onComplete(viewModel.record)
         }
         .confirmationDialog("End this session?", isPresented: $confirmingEnd, titleVisibility: .visible) {
             Button("End session", role: .destructive) { viewModel.endEarly() }

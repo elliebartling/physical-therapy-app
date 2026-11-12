@@ -20,6 +20,7 @@ public final class SessionViewModel {
     private let audio: AudioCueService?
     private let haptics: HapticService?
     private let health: HealthRecorder?
+    private let ratingTiming: RatingTiming
 
     public private(set) var currentExerciseName = ""
     public private(set) var currentNotes = ""
@@ -36,6 +37,13 @@ public final class SessionViewModel {
     public private(set) var resumeWindowExpired = false
     public private(set) var endedEarly = false
 
+    /// Asks how the exercise just finished felt (only when rating after each one).
+    public struct RatingPrompt: Equatable, Identifiable {
+        public let id: UUID          // the exercise record being rated
+        public let exerciseName: String
+    }
+    public private(set) var ratingPrompt: RatingPrompt?
+
     private var sessionRecord: SessionRecord
     private var currentExercise: Exercise?
     private var exerciseStartedAt: Date = .now
@@ -46,13 +54,15 @@ public final class SessionViewModel {
     public init(routine: Routine, sessionRepo: SessionRepository,
                 clock: Clock = SystemClock(), audio: AudioCueService? = AudioCueService(),
                 haptics: HapticService? = HapticService(),
-                health: HealthRecorder? = HealthRecorder()) {
+                health: HealthRecorder? = HealthRecorder(),
+                ratingTiming: RatingTiming = .load()) {
         self.routine = routine
         self.engine = SessionEngine(routine: routine, clock: clock)
         self.sessionRepo = sessionRepo
         self.audio = audio
         self.haptics = haptics
         self.health = health
+        self.ratingTiming = ratingTiming
         self.sessionRecord = SessionRecord(routineID: routine.id, startedAt: .now)
     }
 
@@ -84,6 +94,18 @@ public final class SessionViewModel {
     public func resume() { engine.resume() }
     public func completeCurrentSet() async { try? await engine.completeCurrentSet() }
     public func skipCurrentSet() async { try? await engine.skipCurrentSet() }
+
+    /// The session's record, for the summary once it's complete.
+    public var record: SessionRecord { sessionRecord }
+
+    /// Rates the exercise the current prompt is about, and closes the prompt.
+    public func rate(_ rating: ExerciseRating) {
+        guard let prompt = ratingPrompt else { return }
+        sessionRecord.exerciseRecords.first { $0.id == prompt.id }?.rating = rating
+        ratingPrompt = nil
+    }
+
+    public func dismissRatingPrompt() { ratingPrompt = nil }
 
     /// Stops the session and keeps what was done as a partial session (no `completedAt`).
     public func endEarly() {
@@ -156,10 +178,12 @@ public final class SessionViewModel {
         case .exerciseCompleted(let id):
             audio?.play(.exerciseDone)
             haptics?.fire(.success)
-            sessionRecord.exerciseRecords.append(
-                ExerciseRecord(exerciseID: id, status: .completed,
-                               startedAt: exerciseStartedAt, completedAt: .now)
-            )
+            let record = ExerciseRecord(exerciseID: id, status: .completed,
+                                        startedAt: exerciseStartedAt, completedAt: .now)
+            sessionRecord.exerciseRecords.append(record)
+            if ratingTiming == .afterEach {
+                ratingPrompt = RatingPrompt(id: record.id, exerciseName: currentExerciseName)
+            }
         case .sessionCompleted:
             audio?.play(.sessionDone)
             haptics?.fire(.success)
