@@ -45,6 +45,22 @@ public final class SetupViewModel {
         )
     }
 
+    /// Picked files (PDFs, images, text), in order, read as one routine.
+    public func parse(fileURLs: [URL]) async {
+        guard !fileURLs.isEmpty else { return }
+        phase = .parsing(fileURLs.count == 1 ? "Reading your file…" : "Reading \(fileURLs.count) files…")
+        await run(
+            { [parser] in try await parser.parse(fileURLs: fileURLs) },
+            noTextMessage: "We couldn't find any text in that. Try a clearer copy — or enter your routine manually."
+        )
+    }
+
+    /// The Files picker couldn't hand the files over.
+    public func fileImportFailed(_ error: Error) {
+        logger.error("File import failed: \(String(describing: error), privacy: .public)")
+        phase = .failed("We couldn't open that file. Try picking it again — or enter your routine manually.")
+    }
+
     /// A spoken or typed description of the routine.
     public func parse(transcript: String) async {
         phase = .parsing("Turning that into a routine…")
@@ -86,6 +102,8 @@ public final class SetupViewModel {
             draft = .init(name: "My routine", exercises: [])
             if case ParsingError.noTextFound = error {
                 phase = .failed(noTextMessage)
+            } else if case ParsingError.unreadableFile = error {
+                phase = .failed("We couldn't open that file. Try a PDF, a photo or a text file — or enter your routine manually.")
             } else {
                 logger.error("Routine parse failed: \(String(describing: error), privacy: .public)")
                 phase = .failed("Something went wrong reading that. Try again, or enter your routine manually.")

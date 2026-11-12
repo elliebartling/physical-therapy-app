@@ -75,6 +75,43 @@ final class SetupViewModelTests: XCTestCase {
         _ = container
     }
 
+    func test_parseFile_opensEditorWithExtractedRoutine() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let repo = RoutineRepository(context: container.mainContext)
+        let canned = ParsedRoutine(name: "Knee", exercises: [
+            .init(name: "Bridges", reps: 10, sets: 3, durationSec: nil, restSec: 30, side: "both", notes: "")
+        ])
+        let vm = SetupViewModel(routineRepo: repo,
+                                parser: RoutineParser(extractors: [StubExtractor(result: canned)]))
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).txt")
+        try "Bridges 3 x 10".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        await vm.parse(fileURLs: [file])
+
+        XCTAssertEqual(vm.phase, .editing)
+        XCTAssertEqual(vm.editorVM?.exercises.map(\.name), ["Bridges"])
+        _ = container
+    }
+
+    func test_parseUnsupportedFile_failsWithActionableMessage() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let repo = RoutineRepository(context: container.mainContext)
+        let vm = SetupViewModel(routineRepo: repo,
+                                parser: RoutineParser(extractors: [StubExtractor(result: .init(name: "K", exercises: []))]))
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).zip")
+        try Data([0x50, 0x4B]).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        await vm.parse(fileURLs: [file])
+
+        guard case .failed(let message) = vm.phase else {
+            return XCTFail("expected .failed, got \(vm.phase)")
+        }
+        XCTAssertTrue(message.contains("PDF"))
+        _ = container
+    }
+
     func test_startOver_returnsToSourceChoice() throws {
         let container = try ModelContainerFactory.inMemory()
         let vm = SetupViewModel(routineRepo: RoutineRepository(context: container.mainContext))
