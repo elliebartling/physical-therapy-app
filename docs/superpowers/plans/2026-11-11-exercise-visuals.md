@@ -770,7 +770,9 @@ git commit -m "feat(ui): show exercise figures in Today and session"
 
 **Interfaces:**
 - Consumes: `ExerciseFigure` (Task 7), `ExerciseMatcher`, `CatalogEntry` (Tasks 3, 5).
-- Produces: `public struct ArtPickerView: View { public init(art: Binding<ArtChoice>, exerciseName: String, matcher: ExerciseMatcher = .init()) }`
+- Produces: `public struct ArtPickerView: View { public init(art: Binding<ArtChoice>, exerciseName: String, notes: String = "", matcher: ExerciseMatcher = .init()) }`
+
+`notes` is not optional detail. Import matches with the sheet's notes; if the picker re-matches without them its suggestions diverge from the import's, which makes the exercise's existing choice more likely to fall out of the list — exactly when the user needs to see it. The picker must also list the current choice first when the matcher no longer suggests it, computed synchronously from `art` so it is visible before any match runs.
 
 **This one control covers both of the spec's editing moments** — import review and after-save correction — because `EditRoutineView` and `SetupView` both reach `ExerciseEditorView` through `RoutineEditorView`. Nothing else is needed to make a picture correctable after Save.
 
