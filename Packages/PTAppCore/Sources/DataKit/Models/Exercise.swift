@@ -14,6 +14,9 @@ public final class Exercise {
     /// Shared by the same exercise across routine versions. Optional so stores
     /// from before versioning migrate; read it through `lineageID`.
     public var lineageStorage: UUID?
+    /// Raw `ArtChoice`. Optional so stores from before illustrations migrate;
+    /// read it through `art`.
+    public var artRaw: String?
 
     public init(
         id: UUID = UUID(),
@@ -24,7 +27,8 @@ public final class Exercise {
         notes: String = "",
         order: Int = 0,
         media: [Asset] = [],
-        lineageID: UUID? = nil
+        lineageID: UUID? = nil,
+        art: ArtChoice = .unmatched
     ) {
         self.id = id
         self.name = name
@@ -35,6 +39,7 @@ public final class Exercise {
         self.order = order
         self.media = media
         self.lineageStorage = lineageID
+        self.artRaw = art.rawValue
     }
 
     /// The same exercise across phases: history and charts group by this.
@@ -52,5 +57,11 @@ public final class Exercise {
     public var side: Side {
         get { Side(rawValue: sideRaw) ?? .both }
         set { sideRaw = newValue.rawValue }
+    }
+
+    /// Which illustration to show; `.unmatched` when unset or unrecognised.
+    public var art: ArtChoice {
+        get { artRaw.flatMap(ArtChoice.init(rawValue:)) ?? .unmatched }
+        set { artRaw = newValue.rawValue }
     }
 }
