@@ -18,14 +18,20 @@ public final class SettingsViewModel {
         didSet { healthPreferences.save(to: defaults) }
     }
 
+    /// Shown under the app icon picker when switching icons failed.
+    public private(set) var appIconMessage: String?
+
     private let scheduler = NotificationScheduler()
     private let workoutStore: any WorkoutStore
     private let defaults: UserDefaults
+    private let appIcons: AppIconController
 
     public init(workoutStore: any WorkoutStore = HealthKitWorkoutStore(),
-                defaults: UserDefaults = .standard) {
+                defaults: UserDefaults = .standard,
+                appIcons: AppIconController = AppIconController()) {
         self.workoutStore = workoutStore
         self.defaults = defaults
+        self.appIcons = appIcons
         let saved = HealthPreferences.load(from: defaults)
         self.healthEnabled = saved.isEnabled
         self.healthKind = saved.kind
@@ -33,6 +39,11 @@ public final class SettingsViewModel {
 
     private var healthPreferences: HealthPreferences {
         HealthPreferences(isEnabled: healthEnabled, kind: healthKind)
+    }
+
+    /// Puts the home-screen icon in step with the chosen design and accent.
+    public func applyAppIcon(style: AppIconStyle, accent: AccentChoice, matchesAccent: Bool) async {
+        appIconMessage = await appIcons.apply(style: style, accent: accent, matchesAccent: matchesAccent)
     }
 
     /// Turning on asks for permission first; it stays off if Health isn't
