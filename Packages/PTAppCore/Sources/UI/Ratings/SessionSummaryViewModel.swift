@@ -33,13 +33,14 @@ public final class SessionSummaryViewModel {
         let exercises = routine?.exercises ?? []
         let names = Dictionary(exercises.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let order = Dictionary(exercises.map { ($0.id, $0.order) }, uniquingKeysWith: { first, _ in first })
-        self.items = record.exerciseRecords
+        let done = record.exerciseRecords
             .filter { $0.status == .completed }
             .sorted { (order[$0.exerciseID] ?? .max, $0.startedAt) < (order[$1.exerciseID] ?? .max, $1.startedAt) }
             .map { Item(id: $0.id, name: names[$0.exerciseID] ?? "Exercise", rating: $0.rating) }
+        self.items = done
         self.painLevel = record.painLevel
         self.note = record.note ?? ""
-        self.showsRatings = ratingTiming != .off && !items.isEmpty
+        self.showsRatings = ratingTiming != .off && !done.isEmpty
     }
 
     public var unratedCount: Int { items.filter { $0.rating == nil }.count }
