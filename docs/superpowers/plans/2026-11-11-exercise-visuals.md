@@ -44,7 +44,7 @@
 cd Packages/PTAppCore && xcodebuild test -scheme PTAppCore-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
 ```
 
-Single suite, substitute as needed: append `-only-testing:PTAppCore-Package:MediaKitTests`.
+Single suite, substitute as needed: append `-only-testing:MediaKitTests`.
 
 ## Review Focus
 
@@ -101,7 +101,7 @@ func test_exerciseArtSurvivesAssignment() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:DataKitTests/ArtChoiceTests`
+Run: `xcodebuild test ... -only-testing:DataKitTests/ArtChoiceTests`
 Expected: FAIL — `ArtChoice` and `Exercise.art` do not exist.
 
 - [ ] **Step 3: Implement `ArtChoice` and add `art` to `Exercise`**
@@ -110,7 +110,7 @@ Add `art: ArtChoice = .unmatched` as the last parameter of `Exercise.init`, afte
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:DataKitTests`
+Run: `xcodebuild test ... -only-testing:DataKitTests`
 Expected: PASS, including existing model and repository tests.
 
 - [ ] **Step 5: Commit**
@@ -191,7 +191,7 @@ func test_decodingWithoutArtDefaultsToUnmatched() throws {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:ParsingKitTests/ParsedRoutineTests`
+Run: `xcodebuild test ... -only-testing:ParsingKitTests/ParsedRoutineTests`
 Expected: FAIL — no `art` parameter.
 
 - [ ] **Step 3: Add `art` to `ParsedExercise` and carry it through all three conversions**
@@ -200,7 +200,7 @@ Add `art` as the last `init` parameter with default `.unmatched`, add it to `Cod
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:ParsingKitTests`
+Run: `xcodebuild test ... -only-testing:ParsingKitTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -254,7 +254,7 @@ func test_slugsAreUnique() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:MediaKitTests`
+Run: `xcodebuild test ... -only-testing:MediaKitTests`
 Expected: FAIL — target does not exist.
 
 - [ ] **Step 3: Add the target, write the generator, commit its output, implement `ExerciseCatalog`**
@@ -263,7 +263,7 @@ Expected: FAIL — target does not exist.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:MediaKitTests`
+Run: `xcodebuild test ... -only-testing:MediaKitTests`
 Expected: PASS, 3 tests.
 
 - [ ] **Step 5: Commit**
@@ -331,7 +331,7 @@ func test_scoresAreDescendingAndNormalised() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:MediaKitTests/CandidateScorerTests`
+Run: `xcodebuild test ... -only-testing:MediaKitTests/CandidateScorerTests`
 Expected: FAIL — `CandidateScorer` not defined.
 
 - [ ] **Step 3: Implement `CandidateScorer`**
@@ -340,7 +340,7 @@ Expected: FAIL — `CandidateScorer` not defined.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:MediaKitTests`
+Run: `xcodebuild test ... -only-testing:MediaKitTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -423,7 +423,7 @@ func test_slugNotInShortlistIsDiscarded() async {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:MediaKitTests/ExerciseMatcherTests`
+Run: `xcodebuild test ... -only-testing:MediaKitTests/ExerciseMatcherTests`
 Expected: FAIL — `ExerciseMatcher` not defined.
 
 - [ ] **Step 3: Implement `ExerciseMatcher`, `FoundationModelsRanker`, `StubRanker`, `ThrowingRanker`**
@@ -432,7 +432,7 @@ Expected: FAIL — `ExerciseMatcher` not defined.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:MediaKitTests`
+Run: `xcodebuild test ... -only-testing:MediaKitTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -519,7 +519,7 @@ func test_concurrentRequestsForTheSameFrameDownloadOnce() async {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:MediaKitTests/ArtStoreTests`
+Run: `xcodebuild test ... -only-testing:MediaKitTests/ArtStoreTests`
 Expected: FAIL — `ArtStore` not defined.
 
 - [ ] **Step 3: Implement `ArtStore`, `CDNFrameDownloader`, `StubFrameDownloader`, `TempDirectory`**
@@ -528,7 +528,7 @@ Expected: FAIL — `ArtStore` not defined.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:MediaKitTests`
+Run: `xcodebuild test ... -only-testing:MediaKitTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -574,7 +574,7 @@ func test_figureIsHiddenFromVoiceOver() throws {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests/ExerciseFigureTests`
+Run: `xcodebuild test ... -only-testing:UITests/ExerciseFigureTests`
 Expected: FAIL — `ExerciseFigure` not defined.
 
 - [ ] **Step 3: Implement `ExerciseFigure`**
@@ -583,7 +583,7 @@ Load through the store in a `.task`, keyed on slug and frame so a change reloads
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests`
+Run: `xcodebuild test ... -only-testing:UITests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -639,7 +639,7 @@ Adapt the parser and phase assertions to whatever `SetupViewModel` actually expo
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests/SetupViewModelTests`
+Run: `xcodebuild test ... -only-testing:UITests/SetupViewModelTests`
 Expected: FAIL — no `matcher` parameter.
 
 - [ ] **Step 3: Add matching to `SetupViewModel`**
@@ -648,7 +648,7 @@ Build `editorVM` after matching, so the editor sees the assigned art.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests`
+Run: `xcodebuild test ... -only-testing:UITests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -698,7 +698,7 @@ func test_currentArtTracksTheCurrentExercise() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests`
+Run: `xcodebuild test ... -only-testing:UITests`
 Expected: FAIL — no `art` on `ExerciseRow`, no `currentArt`.
 
 - [ ] **Step 3: Add `art` to `ExerciseRow` and `currentArt` to `SessionViewModel`, then place the figures**
@@ -707,7 +707,7 @@ Expected: FAIL — no `art` on `ExerciseRow`, no `currentArt`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests`
+Run: `xcodebuild test ... -only-testing:UITests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -763,7 +763,7 @@ func test_editorShowsThePictureSection() throws {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests/ArtPickerViewTests`
+Run: `xcodebuild test ... -only-testing:UITests/ArtPickerViewTests`
 Expected: FAIL — `ArtPickerView` not defined.
 
 - [ ] **Step 3: Implement `ArtPickerView` and wire it into the editor**
@@ -772,7 +772,7 @@ Suggestions load in a `.task`; the picker is usable before they arrive, since "N
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests`
+Run: `xcodebuild test ... -only-testing:UITests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -818,7 +818,7 @@ func test_exerciseFromAnEarlierPhaseHasNoArt() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests/ProgressViewModelTests`
+Run: `xcodebuild test ... -only-testing:UITests/ProgressViewModelTests`
 Expected: FAIL — no `art` on `ExerciseRow`.
 
 - [ ] **Step 3: Add `art` to `ExerciseRow` and place the figure, scrub and attribution**
@@ -891,7 +891,7 @@ func test_sheetHowToDoesNotLeakIntoNotes() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:DataKitTests`
+Run: `xcodebuild test ... -only-testing:DataKitTests`
 Expected: FAIL — `HowToSection` not defined.
 
 - [ ] **Step 3: Implement `HowToSection`, thread it through model, DTO, both editing conversions and the extractor, and render it on the exercise screen**
@@ -938,7 +938,7 @@ Check `SettingsView`'s current initialiser before writing — it may have grown 
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test ... -only-testing:PTAppCore-Package:UITests/SettingsSnapshotTests`
+Run: `xcodebuild test ... -only-testing:UITests/SettingsSnapshotTests`
 Expected: FAIL — text not present.
 
 - [ ] **Step 3: Add the Credits section**
