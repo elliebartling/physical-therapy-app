@@ -1,8 +1,8 @@
 import Foundation
 import FoundationModels
 
-/// On-device LLM extractor. The only file in the package allowed to
-/// import FoundationModels.
+/// On-device LLM extractor. One of two files in the package allowed to
+/// import FoundationModels (the other is MediaKit/FoundationModelsRanker.swift).
 public struct FoundationModelsExtractor: RoutineExtractor {
     public init() {}
 
