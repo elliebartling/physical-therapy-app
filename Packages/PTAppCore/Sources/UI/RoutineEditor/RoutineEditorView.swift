@@ -1,5 +1,6 @@
 import SwiftUI
 import ParsingKit
+import DataKit
 
 public struct RoutineEditorView: View {
     @Bindable public var viewModel: RoutineEditorViewModel
@@ -28,7 +29,7 @@ public struct RoutineEditorView: View {
                 Section("Exercises") {
                     ForEach($viewModel.exercises, id: \.id) { $ex in
                         NavigationLink(destination: ExerciseEditorView(exercise: $ex)) {
-                            ExerciseSummaryRow(name: ex.name, summary: summary(for: ex))
+                            ExerciseSummaryRow(name: ex.name, summary: summary(for: ex), art: ex.art)
                         }
                     }
                     .onDelete(perform: viewModel.remove)
@@ -74,15 +75,20 @@ public struct RoutineEditorView: View {
 private struct ExerciseSummaryRow: View {
     let name: String
     let summary: String
+    let art: ArtChoice
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(name)
-                .font(AppFont.display(16, weight: .medium))
-                .fixedSize(horizontal: false, vertical: true)
-            Text(summary)
-                .font(AppFont.mono(12))
-                .foregroundStyle(AppColor.inkSecondary)
+        HStack(spacing: 12) {
+            ExerciseFigure(art: art)
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(name)
+                    .font(AppFont.display(16, weight: .medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(summary)
+                    .font(AppFont.mono(12))
+                    .foregroundStyle(AppColor.inkSecondary)
+            }
         }
         .padding(.vertical, 2)
     }

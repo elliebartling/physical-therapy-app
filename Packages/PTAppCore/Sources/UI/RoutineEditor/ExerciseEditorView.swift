@@ -1,6 +1,7 @@
 import SwiftUI
 import ParsingKit
 import DataKit
+import MediaKit
 
 public struct ExerciseEditorView: View {
     @Binding public var exercise: ParsedRoutine.ParsedExercise
@@ -23,6 +24,9 @@ public struct ExerciseEditorView: View {
                 TextField("Name", text: $exercise.name, axis: .vertical)
                     .font(AppFont.display(18, weight: .semibold))
                     .lineLimit(1...4)
+            }
+            Section("Picture") {
+                PictureLink(exercise: $exercise)
             }
             Section("Target") {
                 Picker("Type", selection: $kind) {
@@ -66,5 +70,24 @@ public struct ExerciseEditorView: View {
         }
         .navigationTitle("Exercise")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// The current figure and a link to the picker.
+private struct PictureLink: View {
+    @Binding var exercise: ParsedRoutine.ParsedExercise
+
+    var body: some View {
+        NavigationLink {
+            ArtPickerView(art: $exercise.art, exerciseName: exercise.name)
+        } label: {
+            HStack(spacing: 14) {
+                ExerciseFigure(art: exercise.art)
+                    .frame(width: 72, height: 72)
+                Text("Change picture")
+                    .font(AppFont.display(16, weight: .medium))
+            }
+            .frame(minHeight: 72)
+        }
     }
 }

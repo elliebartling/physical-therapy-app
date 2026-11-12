@@ -19,7 +19,7 @@ public final class RoutineEditorViewModel {
 
     public func addExercise() {
         exercises.append(.init(name: "New exercise", reps: 10, sets: 3,
-                               durationSec: nil, restSec: 30, side: "both", notes: ""))
+                               durationSec: nil, restSec: 30, side: "both", notes: "", art: .unmatched))
     }
     public func remove(at offsets: IndexSet) { exercises.remove(atOffsets: offsets) }
     public func move(fromOffsets: IndexSet, toOffset: Int) {
