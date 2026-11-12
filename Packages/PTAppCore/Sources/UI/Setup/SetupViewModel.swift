@@ -11,7 +11,17 @@ private let logger = Logger(subsystem: "PTAppCore", category: "setup")
 @Observable
 public final class SetupViewModel {
     /// `parsing` carries the message to show while the routine is being read.
-    public enum Phase: Equatable { case idle, parsing(String), editing, saved, failed(String) }
+    /// `reviewing` shows what a new sheet changes before it replaces the current routine.
+    public enum Phase: Equatable {
+        case idle, parsing(String), editing, reviewing(RoutineChanges), saved, failed(String)
+    }
+
+    /// The routine a new sheet would replace.
+    public struct CurrentRoutine: Equatable {
+        public let name: String
+        public let phase: Int
+        public let exercises: [ExerciseSpec]
+    }
 
     private let routineRepo: RoutineRepository
     private let parser: RoutineParser
@@ -19,10 +29,23 @@ public final class SetupViewModel {
     public var phase: Phase = .idle
     public var draft: ParsedRoutine = .init(name: "My routine", exercises: [])
     public var editorVM: RoutineEditorViewModel?
+    /// Set when there's already a routine, so this is an update rather than a first setup.
+    public private(set) var current: CurrentRoutine?
+
+    public var isReplacing: Bool { current != nil }
 
     public init(routineRepo: RoutineRepository, parser: RoutineParser = .init()) {
         self.routineRepo = routineRepo
         self.parser = parser
+        do {
+            if let routine = try routineRepo.fetchActive() {
+                current = CurrentRoutine(name: routine.name, phase: routine.phase,
+                                         exercises: routine.orderedExercises.map { ExerciseSpec($0) })
+            }
+        } catch {
+            // Without the current routine there's nothing to compare against; saving still replaces it.
+            logger.error("Loading the current routine failed: \(String(describing: error), privacy: .public)")
+        }
     }
 
     public func parse(_ image: UIImage) async {
@@ -81,6 +104,33 @@ public final class SetupViewModel {
         draft = .init(name: "My routine", exercises: [])
         editorVM = nil
         phase = .idle
+    }
+
+    /// The editor's Save: review the changes first when replacing a routine, otherwise save.
+    public func save() {
+        if let editorVM { draft = editorVM.snapshot() }
+        if let current {
+            let changes = RoutineChanges(from: current.exercises,
+                                         to: draft.toRoutine().orderedExercises.map { ExerciseSpec($0) })
+            phase = .reviewing(changes)
+        } else {
+            confirm()
+        }
+    }
+
+    /// Back from the review to the editor, keeping the edits.
+    public func backToEditing() {
+        phase = .editing
+    }
+
+    /// Saves the draft as the active routine, reporting a failure rather than dropping it.
+    public func confirm() {
+        do {
+            try commit()
+        } catch {
+            logger.error("Saving the routine failed: \(String(describing: error), privacy: .public)")
+            phase = .failed("We couldn't save your routine. Try again — your current routine hasn't changed.")
+        }
     }
 
     public func commit() throws {

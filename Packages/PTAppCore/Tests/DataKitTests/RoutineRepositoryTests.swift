@@ -63,4 +63,50 @@ final class RoutineRepositoryTests: XCTestCase {
         XCTAssertEqual(try repo.fetchAll().count, 1)
         XCTAssertEqual(try ctx.fetch(FetchDescriptor<Exercise>()).count, 1, "removed exercise is deleted, not orphaned")
     }
+
+    func test_replaceActive_carriesLineageForMatchingNames_andStartsTheNextPhase() throws {
+        let (repo, _) = makeRepo()
+        let bridges = Exercise(name: "Bridges", target: .repsSets(reps: 10, sets: 3), restSeconds: 30, side: .both, order: 0)
+        let wallSit = Exercise(name: "Wall sit", target: .timeSets(seconds: 30, sets: 3), restSeconds: 20, side: .both, order: 1)
+        let phase1 = Routine(name: "Knee", exercises: [bridges, wallSit])
+        try repo.save(phase1)
+
+        let newBridges = Exercise(name: "bridges", target: .repsSets(reps: 15, sets: 3), restSeconds: 30, side: .both, order: 0)
+        let stepUps = Exercise(name: "Step ups", target: .repsSets(reps: 10, sets: 2), restSeconds: 30, side: .alternating, order: 1)
+        try repo.replaceActive(with: Routine(name: "Knee", exercises: [newBridges, stepUps]))
+
+        let active = try XCTUnwrap(repo.fetchActive())
+        XCTAssertEqual(active.phase, 2)
+        XCTAssertEqual(active.previousVersionID, phase1.id)
+        XCTAssertEqual(newBridges.lineageID, bridges.lineageID)
+        XCTAssertNotEqual(newBridges.id, bridges.id)
+        XCTAssertEqual(stepUps.lineageID, stepUps.id)
+        // The old phase stays, inactive, with the removed exercise still in it.
+        XCTAssertFalse(phase1.isActive)
+        XCTAssertEqual(try repo.fetchAll().count, 2)
+        XCTAssertTrue(phase1.exercises.contains { $0.name == "Wall sit" })
+    }
+
+    func test_replaceActive_twice_keepsTheFirstLineage() throws {
+        let (repo, _) = makeRepo()
+        let original = Exercise(name: "Clamshells", target: .repsSets(reps: 10, sets: 3), restSeconds: 30, side: .left, order: 0)
+        try repo.save(Routine(name: "Hip", exercises: [original]))
+        try repo.replaceActive(with: Routine(name: "Hip", exercises: [
+            Exercise(name: "Clamshells", target: .repsSets(reps: 12, sets: 3), restSeconds: 30, side: .left, order: 0)
+        ]))
+        let third = Exercise(name: "Clamshells", target: .repsSets(reps: 15, sets: 3), restSeconds: 30, side: .left, order: 0)
+        try repo.replaceActive(with: Routine(name: "Hip", exercises: [third]))
+
+        XCTAssertEqual(third.lineageID, original.id)
+        XCTAssertEqual(try repo.fetchActive()?.phase, 3)
+    }
+
+    func test_firstRoutine_isPhaseOne_andEachExerciseIsItsOwnLineage() throws {
+        let (repo, _) = makeRepo()
+        let bridges = Exercise(name: "Bridges", target: .repsSets(reps: 10, sets: 3), restSeconds: 30, side: .both, order: 0)
+        try repo.replaceActive(with: Routine(name: "Knee", exercises: [bridges]))
+        XCTAssertEqual(try repo.fetchActive()?.phase, 1)
+        XCTAssertNil(try repo.fetchActive()?.previousVersionID)
+        XCTAssertEqual(bridges.lineageID, bridges.id)
+    }
 }

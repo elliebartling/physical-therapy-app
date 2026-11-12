@@ -136,4 +136,30 @@ final class ProgressViewModelTests: XCTestCase {
         XCTAssertEqual(try sessionRepo.fetchAll().count, 1)
         XCTAssertFalse(vm.deleteSession(id: UUID()), "an unknown session isn't deleted")
     }
+
+    func test_aNewPhase_continuesHistoryForExercisesWithTheSameName() throws {
+        try guided(start: day(9), minutes: 10, done: [bridges, wallSit])
+        let oldBridges = bridges
+        try routineRepo.replaceActive(with: Routine(name: "Knee", exercises: [
+            Exercise(name: "Bridges", target: .repsSets(reps: 15, sets: 3), restSeconds: 30, side: .both, order: 0),
+            Exercise(name: "Step ups", target: .repsSets(reps: 10, sets: 2), restSeconds: 30, side: .both, order: 1),
+        ]))
+        let phase2 = try XCTUnwrap(routineRepo.fetchActive())
+        let newBridges = phase2.orderedExercises[0]
+        let session = SessionRecord(routineID: phase2.id, startedAt: day(10), completedAt: day(10), exerciseRecords: [
+            ExerciseRecord(exerciseID: newBridges.id, status: .completed, startedAt: day(10), completedAt: day(10))
+        ])
+        try sessionRepo.insert(session)
+
+        let vm = viewModel()
+
+        XCTAssertEqual(vm.exercises.map(\.name), ["Bridges", "Step ups"])
+        XCTAssertEqual(vm.exercises.first?.stats.completed, 2)
+        XCTAssertEqual(vm.exercises.last?.stats.completed, 0)
+        XCTAssertEqual(vm.entries(forExercise: newBridges.id).count, 2)
+        // The removed exercise still reads by name in the older session.
+        let older = try XCTUnwrap(vm.months.first?.sessions.last)
+        XCTAssertTrue(older.items.map(\.name).contains("Wall sit"))
+        XCTAssertNotEqual(oldBridges.id, newBridges.id)
+    }
 }

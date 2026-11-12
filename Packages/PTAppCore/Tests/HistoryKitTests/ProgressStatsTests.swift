@@ -68,4 +68,21 @@ final class ProgressStatsTests: XCTestCase {
         ]
         XCTAssertEqual(ProgressStats.completedDayCount(in: sessions, calendar: calendar), 2)
     }
+
+    func test_exerciseStats_groupedBy_poolsRecordsAcrossIDs() {
+        let phase1 = UUID(), phase2 = UUID(), other = UUID()
+        let sessions = [
+            complete(on: day(2), records: [ExerciseRecord(exerciseID: phase1, status: .completed, startedAt: day(2), completedAt: day(2))]),
+            complete(on: day(9), records: [
+                ExerciseRecord(exerciseID: phase2, status: .completed, startedAt: day(9), completedAt: day(9)),
+                ExerciseRecord(exerciseID: other, status: .skipped, startedAt: day(9)),
+            ]),
+        ]
+
+        let stats = ProgressStats.exerciseStats(in: sessions, groupedBy: { $0 == phase2 ? phase1 : $0 })
+
+        XCTAssertEqual(stats[phase1], ExerciseStats(completed: 2, skipped: 0, lastDone: day(9)))
+        XCTAssertNil(stats[phase2])
+        XCTAssertEqual(stats[other], ExerciseStats(completed: 0, skipped: 1, lastDone: nil))
+    }
 }
