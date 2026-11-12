@@ -84,9 +84,11 @@ final class ExerciseMatcherTests: XCTestCase {
 
     func test_rankerAlternativesAreCappedAtThree() async {
         let slugs = ["clamshell", "fire-hydrant", "bird-dog", "glute-bridge", "squat"]
-        let m = ExerciseMatcher(ranker: StubRanker(slugs: slugs))
+        // A threshold above any score always widens, so every slug is a candidate
+        // whatever the scorer does.
+        let m = ExerciseMatcher(ranker: StubRanker(slugs: slugs), wideningThreshold: 2)
         let r = await m.match(name: "Side-Lying Clam", notes: "")
-        XCTAssertEqual(r.alternatives.count, 3)
+        XCTAssertEqual(r.alternatives, ["fire-hydrant", "bird-dog", "glute-bridge"])
     }
 
     func test_rankerThrowingFallsBackToStageOne() async {
@@ -136,10 +138,30 @@ final class ExerciseMatcherTests: XCTestCase {
             notes: String(repeating: "n", count: 5000),
             candidates: all
         )
-        print("WIDENED_PROMPT_CHARS=\(prompt.count) INSTRUCTIONS_CHARS=\(FoundationModelsRanker.instructions.count)")
         XCTAssertLessThan(prompt.count, 7000)
         XCTAssertFalse(prompt.contains(String(repeating: "n", count: 201)))
-        XCTAssertTrue(prompt.contains("142 |"))
+        XCTAssertTrue(prompt.contains("\n\(all.count) | "))
+    }
+
+    func test_extremeModelNumbersDoNotTrapAndValidOnesSurvive() throws {
+        let candidates = ExerciseCatalog.bundled.entries.prefix(5).map { ScoredCandidate(entry: $0, score: 0) }
+        let ranking = GenerableRanking(
+            reasoning: "", verdict: .same, choices: [Int.min, 2, Int.max, -1]
+        )
+        let slugs = try FoundationModelsRanker.slugs(from: ranking, candidates: candidates)
+        XCTAssertEqual(slugs, [candidates[1].entry.slug])
+    }
+
+    func test_otherFailureInsideACancelledTaskIsNotAFallbackDecision() async {
+        let task = Task {
+            // Wait until cancelled, then let the ranker fail with an ordinary error.
+            while !Task.isCancelled { await Task.yield() }
+            let m = ExerciseMatcher(ranker: ThrowingRanker())
+            return await m.match(name: "Bird Dog", notes: "")
+        }
+        task.cancel()
+        let r = await task.value
+        XCTAssertEqual(r.choice, ArtChoice.unmatched)
     }
 
     func test_discardedSlugsDoNotPoisonValidOnes() async {

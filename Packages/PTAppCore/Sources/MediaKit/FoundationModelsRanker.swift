@@ -26,8 +26,9 @@ public struct FoundationModelsRanker: CandidateRanker {
     /// "none", so it throws and the matcher falls back to stage 1.
     static func slugs(from ranking: GenerableRanking, candidates: [ScoredCandidate]) throws -> [String] {
         guard ranking.verdict == .same else { return [] }
+        // Model output is untrusted: range-check before any arithmetic.
         let slugs = ranking.choices
-            .filter { candidates.indices.contains($0 - 1) }
+            .filter { $0 >= 1 && $0 <= candidates.count }
             .map { candidates[$0 - 1].entry.slug }
         guard !slugs.isEmpty else { throw RankerFailure() }
         return slugs
