@@ -122,7 +122,11 @@ public struct ExerciseMatcher: Sendable {
 
     private func stageOne(_ shortlist: [ScoredCandidate]) -> MatchResult {
         guard let top = shortlist.first, top.score >= floor else {
-            return MatchResult(choice: ArtChoice.none, alternatives: [])
+            // Stage 1 alone is not a decision that there is no picture: it runs when the
+            // ranker is unavailable or gave no usable answer. `.none` is reserved for a
+            // decision (an available ranker declining, or the user), so this stays
+            // `.unmatched` and a later pass can retry.
+            return MatchResult(choice: ArtChoice.unmatched, alternatives: [])
         }
         let alternatives = shortlist.dropFirst()
             .filter { $0.score >= floor }

@@ -3,6 +3,7 @@ import UIKit
 import Observation
 import DataKit
 import ParsingKit
+import MediaKit
 import os
 
 private let logger = Logger(subsystem: "PTAppCore", category: "setup")
@@ -25,6 +26,8 @@ public final class SetupViewModel {
 
     private let routineRepo: RoutineRepository
     private let parser: RoutineParser
+    private let matcher: ExerciseMatcher
+    private let matchTimeout: Duration
 
     public var phase: Phase = .idle
     public var draft: ParsedRoutine = .init(name: "My routine", exercises: [])
@@ -34,9 +37,17 @@ public final class SetupViewModel {
 
     public var isReplacing: Bool { current != nil }
 
-    public init(routineRepo: RoutineRepository, parser: RoutineParser = .init()) {
+    /// `matchTimeout` caps how long picture matching may hold up the editor.
+    public init(
+        routineRepo: RoutineRepository,
+        parser: RoutineParser = .init(),
+        matcher: ExerciseMatcher = .init(),
+        matchTimeout: Duration = .seconds(5)
+    ) {
         self.routineRepo = routineRepo
         self.parser = parser
+        self.matcher = matcher
+        self.matchTimeout = matchTimeout
         do {
             if let routine = try routineRepo.fetchActive() {
                 current = CurrentRoutine(name: routine.name, phase: routine.phase,
@@ -144,7 +155,8 @@ public final class SetupViewModel {
         noTextMessage: String
     ) async {
         do {
-            let parsed = try await work()
+            var parsed = try await work()
+            parsed.exercises = await withSuggestedArt(parsed.exercises)
             draft = parsed
             editorVM = RoutineEditorViewModel(parsed: parsed)
             phase = .editing
@@ -159,5 +171,59 @@ public final class SetupViewModel {
                 phase = .failed("Something went wrong reading that. Try again, or enter your routine manually.")
             }
         }
+    }
+
+    private enum MatchEvent: Sendable {
+        case matched(Int, ArtChoice)
+        case timedOut
+        case cancelled
+    }
+
+    /// Suggests a picture for every exercise, concurrently. This never fails the import:
+    /// anything that doesn't finish in time stays `.unmatched` (never matched, so a later
+    /// retry is still possible) and the exercises keep their order.
+    private func withSuggestedArt(
+        _ exercises: [ParsedRoutine.ParsedExercise]
+    ) async -> [ParsedRoutine.ParsedExercise] {
+        guard !exercises.isEmpty else { return exercises }
+        let matcher = matcher
+        let timeout = matchTimeout
+        let requests = exercises.enumerated().map { (index: $0.offset, name: $0.element.name, notes: $0.element.notes) }
+
+        let choices: [Int: ArtChoice] = await withTaskGroup(of: MatchEvent.self) { group in
+            for request in requests {
+                group.addTask {
+                    let result = await matcher.match(name: request.name, notes: request.notes)
+                    return .matched(request.index, result.choice)
+                }
+            }
+            group.addTask {
+                // Fires only if matching is still running at the deadline.
+                do { try await Task.sleep(for: timeout) } catch { return .cancelled }
+                return .timedOut
+            }
+            var found: [Int: ArtChoice] = [:]
+            var pending = requests.count
+            loop: while pending > 0, let event = await group.next() {
+                switch event {
+                case .matched(let index, let choice):
+                    found[index] = choice
+                    pending -= 1
+                case .timedOut:
+                    logger.error("Picture matching timed out; leaving the rest unmatched")
+                    break loop
+                case .cancelled:
+                    continue
+                }
+            }
+            group.cancelAll()
+            return found
+        }
+
+        var matched = exercises
+        for (index, choice) in choices where matched.indices.contains(index) && matched[index].art == .unmatched {
+            matched[index].art = choice
+        }
+        return matched
     }
 }

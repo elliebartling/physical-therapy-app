@@ -1,7 +1,9 @@
 import XCTest
 import UIKit
+import SwiftData
 import DataKit
 import ParsingKit
+import MediaKit
 @testable import UI
 
 @MainActor
@@ -205,5 +207,130 @@ final class SetupViewModelTests: XCTestCase {
         XCTAssertEqual(vm.phase, .editing)
         XCTAssertEqual(vm.editorVM?.exercises.map(\.name), ["Bridges", "Step ups"])
         _ = container
+    }
+
+    // MARK: - Picture matching during import
+
+    private let twoExercises = ParsedRoutine(name: "Back", exercises: [
+        .init(name: "Bird dog", reps: 10, sets: 3, durationSec: nil, restSec: 30, side: "both", notes: ""),
+        .init(name: "Cat cow", reps: 10, sets: 3, durationSec: nil, restSec: 30, side: "both", notes: ""),
+    ])
+
+    private let strongAndWeak = ParsedRoutine(name: "Back", exercises: [
+        .init(name: "Bird dog", reps: 10, sets: 3, durationSec: nil, restSec: 30, side: "both", notes: ""),
+        .init(name: "Slant board gastrocnemius stretch", reps: 10, sets: 3, durationSec: nil, restSec: 30, side: "both", notes: ""),
+    ])
+
+    private func makeVM(_ canned: ParsedRoutine, ranker: any CandidateRanker,
+                        timeout: Duration = .seconds(5)) throws -> (SetupViewModel, ModelContainer) {
+        let container = try ModelContainerFactory.inMemory()
+        let repo = RoutineRepository(context: container.mainContext)
+        let vm = SetupViewModel(routineRepo: repo,
+                                parser: RoutineParser(extractors: [StubExtractor(result: canned)]),
+                                matcher: ExerciseMatcher(ranker: ranker),
+                                matchTimeout: timeout)
+        return (vm, container)
+    }
+
+    private func textFile() throws -> URL {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).txt")
+        try "Bird dog 3 x 10".write(to: file, atomically: true, encoding: .utf8)
+        return file
+    }
+
+    func test_parseAssignsArtToEveryDraftExercise() async throws {
+        // StubRanker answers "bird-dog" for both, but the matcher discards slugs outside the
+        // shortlist it offered, so "Cat cow" gets nothing usable from the ranker and falls
+        // back to stage 1, which finds cat-cow-stretch. That is why the second differs.
+        let (vm, container) = try makeVM(twoExercises, ranker: StubRanker(slugs: ["bird-dog"]))
+        await vm.parse(transcript: "Bird dog and cat cow")
+        XCTAssertEqual(vm.phase, .editing)
+        XCTAssertEqual(vm.draft.exercises.map(\.art), [.library(slug: "bird-dog"), .library(slug: "cat-cow-stretch")])
+        XCTAssertEqual(vm.editorVM?.snapshot().exercises.map(\.art),
+                       [.library(slug: "bird-dog"), .library(slug: "cat-cow-stretch")])
+        _ = container
+    }
+
+    func test_fileImportAssignsArt() async throws {
+        let (vm, container) = try makeVM(twoExercises, ranker: StubRanker(slugs: ["bird-dog"]))
+        let file = try textFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        await vm.parse(fileURLs: [file])
+        XCTAssertEqual(vm.draft.exercises.first?.art, .library(slug: "bird-dog"))
+        _ = container
+    }
+
+    func test_transcriptAssignsArt() async throws {
+        let (vm, container) = try makeVM(twoExercises, ranker: StubRanker(slugs: ["bird-dog"]))
+        await vm.parse(transcript: "Bird dog and cat cow, three sets of ten")
+        XCTAssertEqual(vm.draft.exercises.first?.art, .library(slug: "bird-dog"))
+        _ = container
+    }
+
+    func test_matchingFailureStillReachesTheEditor() async throws {
+        let (vm, container) = try makeVM(strongAndWeak, ranker: ThrowingRanker())
+        await vm.parse(transcript: "Bird dog and slant board")
+        XCTAssertEqual(vm.phase, .editing)
+        XCTAssertNotNil(vm.editorVM)
+        XCTAssertEqual(vm.draft.exercises.map(\.name), ["Bird dog", "Slant board gastrocnemius stretch"])
+        // The failed ranker falls back to stage 1: a strong name still gets its picture,
+        // a weak one stays retryable. A failed lookup is never the "no picture" decision.
+        XCTAssertEqual(vm.draft.exercises.map(\.art), [.library(slug: "bird-dog"), .unmatched])
+        _ = container
+    }
+
+    func test_unavailableModelLeavesWeakExercisesRetryableNotNone() async throws {
+        let (vm, container) = try makeVM(strongAndWeak, ranker: StubRanker(slugs: ["bird-dog"], isAvailable: false))
+        await vm.parse(transcript: "Bird dog and slant board")
+        XCTAssertEqual(vm.phase, .editing)
+        XCTAssertEqual(vm.draft.exercises.map(\.art), [.library(slug: "bird-dog"), .unmatched])
+        _ = container
+    }
+
+    func test_slowMatchingTimesOutAndLeavesExercisesRetryable() async throws {
+        // The first exercise answers at once, the second never does: matching ran, and the
+        // deadline released the editor with the slow one still retryable.
+        let (vm, container) = try makeVM(twoExercises, ranker: HangsOnCatCowRanker(), timeout: .milliseconds(200))
+        await vm.parse(transcript: "Bird dog and cat cow")
+        XCTAssertEqual(vm.phase, .editing)
+        XCTAssertEqual(vm.draft.exercises.map(\.art), [.library(slug: "bird-dog"), .unmatched])
+        _ = container
+    }
+
+    func test_resultsLandOnTheirOwnExercise() async throws {
+        let (vm, container) = try makeVM(twoExercises, ranker: SlugByNameRanker())
+        await vm.parse(transcript: "Bird dog and cat cow")
+        XCTAssertEqual(vm.draft.exercises.map(\.art), [.library(slug: "bird-dog"), .library(slug: "cat-cow-stretch")])
+        _ = container
+    }
+
+    func test_manualStartNeverInvokesTheMatcher() async throws {
+        let ranker = RecordingRanker(slugs: ["bird-dog"])
+        let (vm, container) = try makeVM(twoExercises, ranker: ranker)
+        vm.draft = twoExercises
+        vm.startManual()
+        XCTAssertEqual(vm.phase, .editing)
+        XCTAssertTrue(vm.draft.exercises.isEmpty)
+        let calls = await ranker.lastCandidateCount
+        XCTAssertEqual(calls, 0)
+        _ = container
+    }
+}
+
+/// Answers "bird-dog" at once, but never answers "Cat cow" until cancelled.
+private struct HangsOnCatCowRanker: CandidateRanker {
+    let isAvailable = true
+    func rank(name: String, notes: String, candidates: [ScoredCandidate]) async throws -> [String] {
+        if name == "Cat cow" { try await Task.sleep(for: .seconds(60)) }
+        return ["bird-dog"]
+    }
+}
+
+/// Answers per exercise, and the first one slowly, so completion order differs from list order.
+private struct SlugByNameRanker: CandidateRanker {
+    let isAvailable = true
+    func rank(name: String, notes: String, candidates: [ScoredCandidate]) async throws -> [String] {
+        if name == "Bird dog" { try await Task.sleep(for: .milliseconds(100)) }
+        return [name == "Bird dog" ? "bird-dog" : "cat-cow-stretch"]
     }
 }

@@ -26,7 +26,7 @@ final class ExerciseMatcherTests: XCTestCase {
         // Model unavailable must not ship the least-bad slug.
         let m = ExerciseMatcher(ranker: StubRanker(slugs: [], isAvailable: false), floor: 0.99)
         let r = await m.match(name: "Slant Board Gastrocnemius Stretch", notes: "")
-        XCTAssertEqual(r.choice, ArtChoice.none)
+        XCTAssertEqual(r.choice, ArtChoice.unmatched)
     }
 
     func test_clinicalSynonymIsRescuedByWidening() async {
@@ -62,7 +62,7 @@ final class ExerciseMatcherTests: XCTestCase {
         let ranker = RecordingRanker(slugs: ["bird-dog"], isAvailable: false)
         let m = ExerciseMatcher(ranker: ranker)
         let r = await m.match(name: "Quadruped Opposite Arm/Leg Raise", notes: "")
-        XCTAssertEqual(r.choice, ArtChoice.none)
+        XCTAssertEqual(r.choice, ArtChoice.unmatched)
         // Never called, so never handed the whole catalogue.
         let count = await ranker.lastCandidateCount
         XCTAssertEqual(count, 0)
@@ -74,6 +74,16 @@ final class ExerciseMatcherTests: XCTestCase {
         let r = await m.match(name: "Bird Dog", notes: "")
         XCTAssertEqual(r.choice, ArtChoice.none)
         XCTAssertTrue(r.alternatives.isEmpty)
+    }
+
+    func test_noneIsADecisionAndUnmatchedIsNot() async {
+        let weak = "Slant Board Gastrocnemius Stretch"
+        let unavailable = ExerciseMatcher(ranker: StubRanker(slugs: [], isAvailable: false))
+        let declined = ExerciseMatcher(ranker: StubRanker(slugs: []))
+        let unavailableResult = await unavailable.match(name: weak, notes: "")
+        let declinedResult = await declined.match(name: weak, notes: "")
+        XCTAssertEqual(unavailableResult.choice, ArtChoice.unmatched)
+        XCTAssertEqual(declinedResult.choice, ArtChoice.none)
     }
 
     func test_cancellationIsNotTurnedIntoAFallbackDecision() async {
@@ -106,9 +116,10 @@ final class ExerciseMatcherTests: XCTestCase {
     }
 
     func test_unusableRankerAnswerCannotShipBelowTheFloor() async {
+        // Nothing was decided, so the result is retryable rather than "no picture".
         let m = ExerciseMatcher(ranker: StubRanker(slugs: ["totally-made-up"]))
         let r = await m.match(name: "Slant Board Gastrocnemius Stretch", notes: "")
-        XCTAssertEqual(r.choice, ArtChoice.none)
+        XCTAssertEqual(r.choice, ArtChoice.unmatched)
     }
 
     func test_modelNumbersMapBackToSlugsAndOutOfRangeIsDropped() throws {
