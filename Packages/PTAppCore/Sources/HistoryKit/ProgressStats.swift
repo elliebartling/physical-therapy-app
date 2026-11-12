@@ -55,10 +55,20 @@ public enum ProgressStats {
 
     /// Every exercise that appears in a session, keyed by exercise id.
     public static func exerciseStats(in sessions: [SessionRecord]) -> [UUID: ExerciseStats] {
+        exerciseStats(in: sessions, groupedBy: { $0 })
+    }
+
+    /// Every exercise that appears in a session, with records pooled under `key(exerciseID)`.
+    /// Pass an exercise's lineage to count one exercise across routine phases.
+    public static func exerciseStats(
+        in sessions: [SessionRecord],
+        groupedBy key: (UUID) -> UUID
+    ) -> [UUID: ExerciseStats] {
         var stats: [UUID: ExerciseStats] = [:]
         for session in sessions {
             for record in session.exerciseRecords {
-                var entry = stats[record.exerciseID, default: ExerciseStats()]
+                let group = key(record.exerciseID)
+                var entry = stats[group, default: ExerciseStats()]
                 switch record.status {
                 case .completed:
                     entry.completed += 1
@@ -67,7 +77,7 @@ public enum ProgressStats {
                 case .skipped, .partial:
                     entry.skipped += 1
                 }
-                stats[record.exerciseID] = entry
+                stats[group] = entry
             }
         }
         return stats

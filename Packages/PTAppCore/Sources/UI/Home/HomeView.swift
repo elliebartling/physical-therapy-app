@@ -110,16 +110,7 @@ public struct HomeView: View {
                     .tracking(-0.8)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
-                Button(action: onEditRoutine) {
-                    Label("Edit", systemImage: "pencil")
-                        .font(AppFont.display(15, weight: .semibold))
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 44)
-                        .contentShape(Capsule())
-                        .glassEffect(.regular.interactive(), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Edit routine")
+                routineMenu
             }
             .padding(.top, 8)
             VStack(spacing: 0) {
@@ -129,6 +120,28 @@ public struct HomeView: View {
             }
             .padding(.top, 12)
         }
+    }
+
+    /// Change the routine: tweak it in place, or bring in a new sheet after a PT visit.
+    private var routineMenu: some View {
+        Menu {
+            Button(action: onEditRoutine) {
+                Label("Edit exercises", systemImage: "pencil")
+            }
+            Button(action: onSetup) {
+                Label("New sheet from PT…", systemImage: "doc.viewfinder")
+            }
+        } label: {
+            Label("Edit", systemImage: "pencil")
+                .font(AppFont.display(15, weight: .semibold))
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
+                .contentShape(Capsule())
+                .glassEffect(.regular.interactive(), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Edit routine")
+        .accessibilityHint("Edit exercises, or add a new sheet from your PT")
     }
 
     private var emptyContent: some View {
