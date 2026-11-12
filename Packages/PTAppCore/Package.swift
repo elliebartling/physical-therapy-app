@@ -27,9 +27,10 @@ let package = Package(
         .target(
             name: "MediaKit",
             dependencies: ["DataKit"],
+            exclude: ["Resources/generate-catalog.sh"],
             resources: [.process("Resources")]
         ),
-        .target(name: "UI", dependencies: ["DataKit", "ParsingKit", "SessionKit", "HistoryKit"]),
+        .target(name: "UI", dependencies: ["DataKit", "ParsingKit", "SessionKit", "HistoryKit", "MediaKit"]),
         .testTarget(name: "DataKitTests", dependencies: ["DataKit"]),
         .testTarget(name: "ParsingKitTests", dependencies: ["ParsingKit"], resources: [.process("Fixtures")]),
         .testTarget(name: "SessionKitTests", dependencies: ["SessionKit"]),
