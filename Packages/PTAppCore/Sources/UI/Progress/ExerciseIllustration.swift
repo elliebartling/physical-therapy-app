@@ -13,7 +13,9 @@ struct ExerciseIllustration: View {
 
     let art: ArtChoice
     @State private var frame = 1
-    /// Whether a frame has really arrived. Frame 1 is the gate: it is the only
+    /// Whether a frame has really arrived. Sticky across frames (so scrubbing to
+    /// an undownloaded frame never hides the control) but per art: it resets,
+    /// with the frame, when `art` changes. Frame 1 is the gate: it is the only
     /// one shown until this is true. If 2 or 3 are slow, scrubbing to them shows
     /// a blank square, which beats waiting on all three before showing anything.
     @State private var hasLoadedPicture: Bool
@@ -46,12 +48,16 @@ struct ExerciseIllustration: View {
                     credit
                 }
             }
+            .onChange(of: art) {
+                hasLoadedPicture = false
+                frame = 1
+            }
         }
     }
 
     private var credit: some View {
         Text(Self.credit)
-            .font(.caption2.monospaced())
+            .font(Font.custom("JetBrainsMono-Regular", size: 10, relativeTo: .caption2))
             .foregroundStyle(AppColor.inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }

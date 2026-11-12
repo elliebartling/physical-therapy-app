@@ -68,4 +68,32 @@ final class ExerciseFigureTests: XCTestCase {
         XCTAssertTrue(ExerciseFigure.resolveStore(explicit: nil, environment: env) === env)
         XCTAssertTrue(ExerciseFigure.resolveStore(explicit: explicit, environment: env) === explicit)
     }
+
+    // MARK: onLoad (hosted, so the real task runs)
+
+    private func reportedLoad(downloader: StubFrameDownloader) async -> Bool? {
+        let store = ArtStore(downloader: downloader, directory: tempDir())
+        let reported = expectation(description: "onLoad")
+        var result: Bool?
+        let sut = ExerciseFigure(art: .library(slug: "bird-dog"), store: store) { loaded in
+            result = loaded
+            reported.fulfill()
+        }
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 300, height: 300))
+        window.rootViewController = UIHostingController(rootView: sut.frame(width: 200, height: 200))
+        window.makeKeyAndVisible()
+        await fulfillment(of: [reported], timeout: 5)
+        window.isHidden = true
+        return result
+    }
+
+    func test_onLoad_reportsTrueWhenTheFrameArrives() async {
+        let loaded = await reportedLoad(downloader: StubFrameDownloader(data: Self.onePixelPNG))
+        XCTAssertEqual(loaded, true)
+    }
+
+    func test_onLoad_reportsFalseWhenNoFrameIsAvailable() async {
+        let loaded = await reportedLoad(downloader: StubFrameDownloader(failing: true))
+        XCTAssertEqual(loaded, false)
+    }
 }
