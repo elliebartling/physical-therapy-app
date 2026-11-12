@@ -7,6 +7,10 @@ public struct SettingsView: View {
 
     @AppStorage(AccentChoice.storageKey) private var accentRaw = AccentChoice.signal.rawValue
     @AppStorage(RatingTiming.storageKey) private var ratingTiming = RatingTiming.atEnd
+    @AppStorage(AppIconStyle.storageKey) private var iconStyle = AppIconStyle.rangeOfMotion
+    @AppStorage(AppIconStyle.matchesAccentKey) private var iconMatchesAccent = true
+
+    private var accent: AccentChoice { AccentChoice(rawValue: accentRaw) ?? .signal }
 
     public init(viewModel: SettingsViewModel,
                 onReplaceRoutine: @escaping () -> Void,
@@ -19,9 +23,21 @@ public struct SettingsView: View {
     public var body: some View {
         NavigationStack {
             Form {
-                Section("Appearance") {
+                Section {
                     AccentPicker(selection: $accentRaw)
+                    AppIconPicker(selection: $iconStyle,
+                                  accent: iconMatchesAccent ? accent.color : AccentChoice.signal.color)
+                    Toggle("Icon matches accent", isOn: $iconMatchesAccent)
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    if let message = viewModel.appIconMessage {
+                        Text(message)
+                    }
                 }
+                .onChange(of: accentRaw) { _, _ in syncAppIcon() }
+                .onChange(of: iconStyle) { _, _ in syncAppIcon() }
+                .onChange(of: iconMatchesAccent) { _, _ in syncAppIcon() }
 
                 Section("Reminder") {
                     Toggle("Daily reminder", isOn: $viewModel.reminderEnabled)
@@ -61,6 +77,56 @@ public struct SettingsView: View {
                 }
             }
         }
+    }
+}
+
+extension SettingsView {
+    private func syncAppIcon() {
+        Task { await viewModel.applyAppIcon(style: iconStyle, accent: accent, matchesAccent: iconMatchesAccent) }
+    }
+}
+
+/// The two home-screen icon designs, drawn in the current accent.
+struct AppIconPicker: View {
+    @Binding var selection: AppIconStyle
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("App icon")
+            HStack(spacing: 20) {
+                ForEach(AppIconStyle.allCases) { style in
+                    option(style)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func option(_ style: AppIconStyle) -> some View {
+        let isSelected = style == selection
+        return Button {
+            selection = style
+        } label: {
+            VStack(spacing: 6) {
+                AppIconPreview(style: style, accent: accent)
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 14.3, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 17, style: .continuous)
+                            .stroke(AppColor.ink, lineWidth: isSelected ? 2 : 0)
+                            .padding(-3)
+                    }
+                Text(style.title.uppercased())
+                    .font(AppFont.mono(10))
+                    .tracking(0.6)
+                    .foregroundStyle(AppColor.inkSecondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(style.title) icon")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
