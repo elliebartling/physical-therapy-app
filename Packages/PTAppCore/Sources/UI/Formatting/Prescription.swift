@@ -31,7 +31,9 @@ enum SessionEstimate {
             case .repsSets(let reps, _): work = reps * secondsPerRep
             case .timeSets(let s, _): work = s
             }
-            return total + sets * work + max(0, sets - 1) * exercise.restSeconds
+            // Alternating does every set on each side.
+            let sides = exercise.side == .alternating ? 2 : 1
+            return total + sets * sides * work + max(0, sets - 1) * exercise.restSeconds
         }
         guard seconds > 0 else { return 0 }
         return max(1, Int((Double(seconds) / 60).rounded(.up)))
