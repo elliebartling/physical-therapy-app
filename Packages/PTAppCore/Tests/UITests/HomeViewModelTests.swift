@@ -52,4 +52,28 @@ final class HomeViewModelTests: XCTestCase {
 
         _ = container
     }
+
+    func test_startButton_saysWhatItStarts_andHidesWithoutARoutine() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let routineRepo = RoutineRepository(context: container.mainContext)
+        let sessionRepo = SessionRepository(context: container.mainContext)
+        let today = Calendar.current.startOfDay(for: .now).addingTimeInterval(12 * 3600)
+
+        let empty = HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo, today: today)
+        await empty.refresh()
+        XCTAssertNil(empty.startInfo, "nothing to start before setup")
+
+        try routineRepo.save(Routine(name: "Hips", exercises: [
+            Exercise(name: "Bridges", target: .repsSets(reps: 10, sets: 2), restSeconds: 0, side: .both, order: 0),
+        ]))
+        let vm = HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo, today: today)
+        await vm.refresh()
+        XCTAssertEqual(vm.startInfo, MainBar.StartInfo(title: "Start session", detail: "1 EX — 1 MIN"))
+
+        try sessionRepo.insert(SessionRecord(routineID: UUID(), startedAt: today, completedAt: today))
+        await vm.refresh()
+        XCTAssertEqual(vm.startInfo?.title, "Start again")
+
+        _ = container
+    }
 }
