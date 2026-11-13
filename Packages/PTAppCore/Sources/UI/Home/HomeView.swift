@@ -53,15 +53,7 @@ public struct HomeView: View {
             .padding(.bottom, AppSpacing.s(3))
         }
         .scrollIndicators(.hidden)
-        .safeAreaInset(edge: .bottom) {
-            StartSessionBar(
-                title: viewModel.isDoneToday ? "Start again" : "Start session",
-                detail: "\(viewModel.rows.count) EX — \(viewModel.estimatedMinutes) MIN",
-                action: onStart
-            )
-            .padding(.horizontal, AppSpacing.screenPadding)
-            .padding(.bottom, AppSpacing.s(1))
-        }
+        // Start lives in the main bar beside the tabs (MainTabsView).
     }
 
     private var statement: some View {
@@ -289,39 +281,6 @@ private struct ExerciseRowView: View {
         .padding(.vertical, 11)
         .overlay(alignment: .top) { HairlineDivider() }
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct StartSessionBar: View {
-    let title: String
-    let detail: String
-    let action: () -> Void
-    @Environment(\.appAccent) private var accent
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(AppColor.onAccent)
-                    .frame(width: 40, height: 40)
-                    .background(accent, in: Circle())
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(AppFont.display(16, weight: .semibold))
-                    Text(detail)
-                        .font(AppFont.mono(10))
-                        .tracking(0.6)
-                        .opacity(0.75)
-                }
-                Spacer()
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 17, weight: .semibold))
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, 18)
-        }
-        .buttonStyle(InkGlassButtonStyle())
     }
 }
 
