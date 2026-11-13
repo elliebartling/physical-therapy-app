@@ -47,7 +47,7 @@ final class HomeViewModelTests: XCTestCase {
         XCTAssertEqual(vm.rows.map(\.number), ["01", "02"])
         XCTAssertEqual(vm.rows.map(\.name), ["Bridges", "Side plank"])
         XCTAssertEqual(vm.rows.map(\.prescription), ["2×10", "3×30s L/R"])
-        XCTAssertEqual(vm.estimatedMinutes, 4) // 60s + 150s = 210s → 4 min
+        XCTAssertEqual(vm.estimatedMinutes, 5) // bridges 60s + side plank 3 sets × 2 sides × 30s + 2 rests × 30s = 300s
         XCTAssertEqual(vm.headline, "Ready when you are.")
 
         _ = container

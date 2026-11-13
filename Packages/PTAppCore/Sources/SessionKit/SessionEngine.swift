@@ -18,6 +18,11 @@ public final class SessionEngine {
 
     private var isPaused = false
     private var pauseContinuation: CheckedContinuation<Void, Never>?
+    /// Interrupts the hold or rest currently being timed so it stops counting while paused.
+    private var pauseCurrentWait: AsyncStream<Void>.Continuation?
+    /// A skip pressed while a timed hold or rest is paused; it ends that wait on resume.
+    private var skipWhilePaused = false
+    private var isTiming = false
 
     public init(routine: Routine, clock: Clock = SystemClock()) {
         self.routine = routine
@@ -49,6 +54,7 @@ public final class SessionEngine {
     public func pause() {
         guard !isPaused else { return }
         isPaused = true
+        pauseCurrentWait?.yield()
         continuation.yield(.paused)
     }
 
@@ -63,26 +69,53 @@ public final class SessionEngine {
     public func skipCurrentSet() async throws {
         setCompletion?.resume()
         setCompletion = nil
+        if isTiming, isPaused { skipWhilePaused = true }
         skipCurrentWait?.yield()
     }
 
-    /// Sleeps on the clock, returning early if `skipCurrentSet()` is called.
-    /// Still throws if the session's own task is cancelled.
-    private func skippableSleep(seconds: Double) async throws {
+    private enum WaitOutcome: Sendable { case elapsed, skipped, paused }
+
+    /// Times a hold or rest on the clock. Pausing stops the count and resuming carries on
+    /// with what was left; `skipCurrentSet()` ends it early. Still throws if the session's
+    /// own task is cancelled.
+    private func timedWait(seconds: Double) async throws {
+        isTiming = true
+        defer { isTiming = false; skipWhilePaused = false }
+        var remaining = seconds
+        while remaining > 0 {
+            await awaitIfPaused()
+            if skipWhilePaused { return }
+            let started = clock.now
+            switch try await sleepUntilInterrupted(seconds: remaining) {
+            case .elapsed, .skipped: return
+            case .paused: remaining -= clock.now.timeIntervalSince(started)
+            }
+        }
+    }
+
+    /// One uninterrupted stretch of a timed wait: ends when the time is up, on a skip or on a pause.
+    private func sleepUntilInterrupted(seconds: Double) async throws -> WaitOutcome {
         let (skips, skipSignal) = AsyncStream<Void>.makeStream()
+        let (pauses, pauseSignal) = AsyncStream<Void>.makeStream()
         skipCurrentWait = skipSignal
+        pauseCurrentWait = pauseSignal
         defer {
             skipCurrentWait = nil
+            pauseCurrentWait = nil
             skipSignal.finish()
+            pauseSignal.finish()
         }
         let clock = self.clock
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask { try await clock.sleep(seconds: seconds) }
-            group.addTask { for await _ in skips { return } }
-            _ = try await group.next()
+        let outcome = try await withThrowingTaskGroup(of: WaitOutcome.self) { group in
+            group.addTask { try await clock.sleep(seconds: seconds); return .elapsed }
+            group.addTask { for await _ in skips { return .skipped }; return .skipped }
+            group.addTask { for await _ in pauses { return .paused }; return .paused }
+            let first = try await group.next() ?? .elapsed
             group.cancelAll()
+            return first
         }
         try Task.checkCancellation()
+        return outcome
     }
 
     private func awaitIfPaused() async {
@@ -92,31 +125,29 @@ public final class SessionEngine {
         }
     }
 
+    /// An alternating exercise does each set on the left and then the right, so "3 sets"
+    /// means three per side; rest comes between full sets.
     private func runExercise(_ exercise: Exercise) async throws {
         let totalSets = exercise.target.totalSets
+        let sides: [Side] = exercise.side == .alternating ? [.left, .right] : [exercise.side]
         for setIndex in 0..<totalSets {
-            await Task.yield()
-            await awaitIfPaused()
             currentSetIndex = setIndex
-
-            let effectiveSide: Side
-            if exercise.side == .alternating {
-                effectiveSide = setIndex.isMultiple(of: 2) ? .left : .right
-            } else {
-                effectiveSide = exercise.side
-            }
-            continuation.yield(.setStarted(setIndex: setIndex, totalSets: totalSets, side: effectiveSide))
-            if setIndex > 0, exercise.side == .alternating {
-                continuation.yield(.sideSwitch(to: effectiveSide))
-            }
-
-            switch exercise.target {
-            case .repsSets:
-                await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                    setCompletion = cont
+            for (sideIndex, side) in sides.enumerated() {
+                await Task.yield()
+                await awaitIfPaused()
+                continuation.yield(.setStarted(setIndex: setIndex, totalSets: totalSets, side: side))
+                if sideIndex > 0 {
+                    continuation.yield(.sideSwitch(to: side))
                 }
-            case .timeSets(let seconds, _):
-                try await skippableSleep(seconds: Double(seconds))
+
+                switch exercise.target {
+                case .repsSets:
+                    await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                        setCompletion = cont
+                    }
+                case .timeSets(let seconds, _):
+                    try await timedWait(seconds: Double(seconds))
+                }
             }
 
             await Task.yield()
@@ -125,7 +156,7 @@ public final class SessionEngine {
             let isLastSet = setIndex == totalSets - 1
             if !isLastSet, exercise.restSeconds > 0 {
                 continuation.yield(.rest(seconds: exercise.restSeconds))
-                try await skippableSleep(seconds: Double(exercise.restSeconds))
+                try await timedWait(seconds: Double(exercise.restSeconds))
             }
         }
     }

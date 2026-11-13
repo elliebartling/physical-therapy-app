@@ -11,6 +11,18 @@ private final class LineRecorder: RoutineExtractor, @unchecked Sendable {
     }
 }
 
+/// Records the pages the parser hands over, for extractors that read a page at a time.
+private final class PageRecorder: RoutineExtractor, @unchecked Sendable {
+    private(set) var pages: [[String]] = []
+    func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine {
+        ParsedRoutine(name: "Recorded", exercises: [])
+    }
+    func extract(fromPages pages: [[String]]) async throws -> ParsedRoutine {
+        self.pages = pages
+        return ParsedRoutine(name: "Recorded", exercises: [])
+    }
+}
+
 final class RoutineDocumentTests: XCTestCase {
     private var temp: URL!
 
@@ -37,6 +49,19 @@ final class RoutineDocumentTests: XCTestCase {
                 in: CGRect(x: 72, y: 72, width: 468, height: 648),
                 withAttributes: [.font: UIFont.systemFont(ofSize: 18)]
             )
+        }
+    }
+
+    /// A PDF with one page per entry, each with a real text layer.
+    private func multiPagePDF(_ pages: [[String]]) -> Data {
+        UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { context in
+            for lines in pages {
+                context.beginPage()
+                (lines.joined(separator: "\n") as NSString).draw(
+                    in: CGRect(x: 72, y: 72, width: 468, height: 648),
+                    withAttributes: [.font: UIFont.systemFont(ofSize: 18)]
+                )
+            }
         }
     }
 
@@ -141,5 +166,26 @@ final class RoutineDocumentTests: XCTestCase {
         _ = try await RoutineParser(extractors: [recorder]).parse(fileURLs: [first, second])
 
         XCTAssertEqual(recorder.lines, ["Bridges 3x10", "Clams 2x15"])
+    }
+
+    // MARK: Pages
+
+    func test_multiPagePDF_readsEveryPage_andKeepsThemApart() async throws {
+        let recorder = PageRecorder()
+        let pdf = multiPagePDF([["Bridges 3 x 10"], ["Clamshells 2 x 15"], ["Wall sit hold 30 sec"]])
+
+        _ = try await RoutineParser(extractors: [recorder]).parse(documents: [.pdf(pdf)])
+
+        XCTAssertEqual(recorder.pages.count, 3)
+        XCTAssertTrue(recorder.pages[0].joined(separator: " ").contains("Bridges"))
+        XCTAssertTrue(recorder.pages[1].joined(separator: " ").contains("Clamshells"))
+        XCTAssertTrue(recorder.pages[2].joined(separator: " ").contains("Wall sit"))
+    }
+
+    func test_multiPagePDF_givesEveryPageToALineReader() async throws {
+        let lines = try await read([.pdf(multiPagePDF([["Bridges 3 x 10"], ["Clamshells 2 x 15"]]))])
+        let joined = lines.joined(separator: " ")
+        XCTAssertTrue(joined.contains("Bridges"))
+        XCTAssertTrue(joined.contains("Clamshells"))
     }
 }

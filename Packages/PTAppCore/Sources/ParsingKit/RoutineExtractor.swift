@@ -5,6 +5,9 @@ public protocol RoutineExtractor: Sendable {
     /// Defaults to true.
     var isAvailable: Bool { get }
     func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine
+    /// Text from a multi-page source, one array of lines per page, in order.
+    /// Defaults to reading all the lines at once.
+    func extract(fromPages pages: [[String]]) async throws -> ParsedRoutine
     /// A spoken description ("brain dump"). Defaults to splitting it into
     /// sentences and treating them like OCR lines.
     func extract(fromTranscript text: String) async throws -> ParsedRoutine
@@ -15,6 +18,10 @@ public extension RoutineExtractor {
 
     func extract(fromTranscript text: String) async throws -> ParsedRoutine {
         try await extract(fromOCRLines: TranscriptSegmenter.lines(from: text))
+    }
+
+    func extract(fromPages pages: [[String]]) async throws -> ParsedRoutine {
+        try await extract(fromOCRLines: pages.flatMap { $0 })
     }
 }
 

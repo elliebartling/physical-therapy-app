@@ -34,4 +34,11 @@ final class SessionEstimateTests: XCTestCase {
         let bridges = Exercise(name: "Bridges", target: .repsSets(reps: 10, sets: 2), restSeconds: 0, side: .both)
         XCTAssertEqual(SessionEstimate.minutes(for: [bridges]), 1)
     }
+
+    func test_alternating_countsEverySetOnBothSides() {
+        let ex = Exercise(name: "Side plank", target: .timeSets(seconds: 30, sets: 3),
+                          restSeconds: 30, side: .alternating, order: 0)
+        // 3 sets × 2 sides × 30s + 2 rests × 30s = 240s
+        XCTAssertEqual(SessionEstimate.minutes(for: [ex]), 4)
+    }
 }

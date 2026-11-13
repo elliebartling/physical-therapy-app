@@ -23,7 +23,7 @@ public struct SessionView: View {
         TimelineView(.periodic(from: .now, by: 0.25)) { context in
             let reading = TimerReading(display: viewModel.display,
                                        startedAt: viewModel.displayStartedAt,
-                                       now: context.date)
+                                       now: viewModel.pausedAt ?? context.date)
             ZStack(alignment: .bottom) {
                 AppColor.surface
                     .ignoresSafeArea()
