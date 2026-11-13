@@ -35,6 +35,8 @@ public final class SessionViewModel {
     /// When the current `display` began; drives the draining timer field.
     public private(set) var displayStartedAt: Date = .now
     public private(set) var isPaused = false
+    /// When the current pause began; the timer field holds still at this moment.
+    public private(set) var pausedAt: Date?
     public private(set) var isComplete = false
     public private(set) var resumeWindowExpired = false
     public private(set) var endedEarly = false
@@ -191,8 +193,14 @@ public final class SessionViewModel {
         case .sessionCompleted:
             audio?.play(.sessionDone)
             haptics?.fire(.success)
-        case .paused: isPaused = true
-        case .resumed: isPaused = false
+        case .paused:
+            isPaused = true
+            pausedAt = .now
+        case .resumed:
+            isPaused = false
+            // Shift the start by the pause so the timer carries on from where it stopped.
+            if let pausedAt { displayStartedAt += Date.now.timeIntervalSince(pausedAt) }
+            pausedAt = nil
         }
     }
 

@@ -20,7 +20,9 @@ public struct SessionCompleteView: View {
     public var body: some View {
         ZStack(alignment: .bottom) {
             AppColor.surface.ignoresSafeArea()
-            completionField
+            // With the ratings list the field would cut across its rows, so it shows only
+            // behind the plain celebration.
+            if summary == nil { completionField }
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
@@ -68,7 +70,7 @@ public struct SessionCompleteView: View {
     private var completionField: some View {
         Rectangle()
             .fill(accent.fieldTone(for: colorScheme))
-            .containerRelativeFrame(.vertical) { length, _ in length * (appeared ? (summary == nil ? 0.5 : 0.22) : 0) }
+            .containerRelativeFrame(.vertical) { length, _ in length * (appeared ? 0.5 : 0) }
             .frame(maxWidth: .infinity)
             .ignoresSafeArea(edges: .bottom)
             .animation(reduceMotion ? nil : .smooth(duration: 0.6), value: appeared)

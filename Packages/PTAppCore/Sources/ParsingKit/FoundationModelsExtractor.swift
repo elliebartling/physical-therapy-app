@@ -25,6 +25,36 @@ public struct FoundationModelsExtractor: RoutineExtractor {
         return response.content.toParsedRoutine(source: source)
     }
 
+    /// The on-device model's context window (about 4k tokens) has to hold the instructions,
+    /// the input and every exercise it writes back, so a multi-page handout is read a chunk
+    /// at a time and the exercises joined in order.
+    public func extract(fromPages pages: [[String]]) async throws -> ParsedRoutine {
+        var name: String?
+        var exercises: [ParsedRoutine.ParsedExercise] = []
+        for chunk in PageChunker.chunks(pages, maxCharacters: Self.maxChunkCharacters) {
+            let part = try await extractFitting(chunk)
+            if name == nil, !part.exercises.isEmpty { name = part.name }
+            exercises += part.exercises
+        }
+        return ParsedRoutine(name: name ?? "My routine", exercises: exercises)
+    }
+
+    /// About 1,000–1,500 tokens of handout text, leaving room for a page's worth of exercises.
+    static let maxChunkCharacters = 4_000
+
+    /// Reads `lines`, halving them and trying again if they still overflow the window.
+    private func extractFitting(_ lines: [String]) async throws -> ParsedRoutine {
+        do {
+            return try await extract(fromOCRLines: lines)
+        } catch LanguageModelSession.GenerationError.exceededContextWindowSize where lines.count > 1 {
+            let middle = lines.count / 2
+            let first = try await extractFitting(Array(lines[..<middle]))
+            let second = try await extractFitting(Array(lines[middle...]))
+            return ParsedRoutine(name: first.exercises.isEmpty ? second.name : first.name,
+                                 exercises: first.exercises + second.exercises)
+        }
+    }
+
     public func extract(fromTranscript text: String) async throws -> ParsedRoutine {
         let session = LanguageModelSession(instructions: Self.transcriptInstructions)
         let response = try await session.respond(to: text, generating: GenerableRoutine.self)

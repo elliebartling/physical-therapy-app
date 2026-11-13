@@ -47,7 +47,7 @@ final class HomeViewModelTests: XCTestCase {
         XCTAssertEqual(vm.rows.map(\.number), ["01", "02"])
         XCTAssertEqual(vm.rows.map(\.name), ["Bridges", "Side plank"])
         XCTAssertEqual(vm.rows.map(\.prescription), ["2×10", "3×30s L/R"])
-        XCTAssertEqual(vm.estimatedMinutes, 4) // 60s + 150s = 210s → 4 min
+        XCTAssertEqual(vm.estimatedMinutes, 5) // bridges 60s + side plank 3 sets × 2 sides × 30s + 2 rests × 30s = 300s
         XCTAssertEqual(vm.headline, "Ready when you are.")
 
         _ = container
@@ -67,6 +67,31 @@ final class HomeViewModelTests: XCTestCase {
         let vm = HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo)
         await vm.refresh()
         XCTAssertEqual(vm.rows.map(\.art), [.library(slug: "bird-dog"), ArtChoice.none])
+
+        _ = container
+    }
+
+    func test_startButton_saysWhatItStarts_andHidesWithoutARoutine() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let routineRepo = RoutineRepository(context: container.mainContext)
+        let sessionRepo = SessionRepository(context: container.mainContext)
+        let today = Calendar.current.startOfDay(for: .now).addingTimeInterval(12 * 3600)
+
+        let empty = HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo, today: today)
+        await empty.refresh()
+        XCTAssertNil(empty.startInfo, "nothing to start before setup")
+
+        try routineRepo.save(Routine(name: "Hips", exercises: [
+            Exercise(name: "Bridges", target: .repsSets(reps: 10, sets: 2), restSeconds: 0, side: .both, order: 0),
+        ]))
+        let vm = HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo, today: today)
+        await vm.refresh()
+        XCTAssertEqual(vm.startInfo, MainBar.StartInfo(title: "Start session", detail: "1 EX — 1 MIN"))
+
+        try sessionRepo.insert(SessionRecord(routineID: UUID(), startedAt: today, completedAt: today))
+        await vm.refresh()
+        XCTAssertEqual(vm.startInfo?.title, "Start again")
+
         _ = container
     }
 }
