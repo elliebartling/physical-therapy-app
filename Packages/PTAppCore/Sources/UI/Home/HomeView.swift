@@ -53,7 +53,7 @@ public struct HomeView: View {
             .padding(.bottom, AppSpacing.s(3))
         }
         .scrollIndicators(.hidden)
-        // Start lives in the main bar beside the tabs (MainTabsView).
+        // Start is the round button at the end of the tab bar (MainTabsView).
     }
 
     private var statement: some View {

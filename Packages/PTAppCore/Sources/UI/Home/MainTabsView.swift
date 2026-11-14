@@ -6,9 +6,16 @@ public enum MainTab: Hashable, Sendable {
     case today, progress
 }
 
-/// Today and Progress, with one glass bar holding the tab switcher and the Start
-/// button side by side, instead of a start bar stacked over the system tab bar.
+/// Today and Progress in the system tab bar, with Start as the separate round
+/// button at its trailing edge. Choosing Start opens a session rather than a screen,
+/// so the tab bar never stays on it.
 public struct MainTabsView: View {
+    /// What the tab bar can select: a screen, or Start.
+    enum Slot: Hashable {
+        case screen(MainTab)
+        case start
+    }
+
     @Binding private var selection: MainTab
     // Kept for the life of the view, so switching tabs doesn't rebuild either screen.
     @State private var home: HomeViewModel
@@ -32,127 +39,49 @@ public struct MainTabsView: View {
     }
 
     public var body: some View {
-        TabView(selection: $selection) {
-            Tab("Today", systemImage: "sun.max", value: MainTab.today) {
+        TabView(selection: slot) {
+            Tab("Today", systemImage: "sun.max", value: Slot.screen(.today)) {
                 HomeView(viewModel: home, onStart: onStart, onSettings: onSettings,
                          onSetup: onSetup, onEditRoutine: onEditRoutine)
-                    .toolbar(.hidden, for: .tabBar)
-                    .safeAreaInset(edge: .bottom) { bar }
             }
-            Tab("Progress", systemImage: "chart.bar.xaxis", value: MainTab.progress) {
+            Tab("Progress", systemImage: "chart.bar.xaxis", value: Slot.screen(.progress)) {
                 ProgressScreen(viewModel: progress)
-                    .toolbar(.hidden, for: .tabBar)
-                    .safeAreaInset(edge: .bottom) { bar }
+            }
+            if let start = home.startInfo {
+                // The search role gives Start the tab bar's separate trailing button.
+                Tab(start.title, systemImage: "play.fill", value: Slot.start, role: .search) {
+                    Color.clear
+                }
             }
         }
+        .tint(AppColor.ink)
     }
 
-    private var bar: some View {
-        MainBar(selection: $selection, start: home.startInfo, onStart: onStart)
-            .padding(.horizontal, AppSpacing.screenPadding)
-            .padding(.bottom, AppSpacing.s(1))
+    /// Selecting Start runs `onStart` and leaves the current screen selected.
+    private var slot: Binding<Slot> {
+        Binding(
+            get: { .screen(selection) },
+            set: { Self.route($0, selection: &selection, onStart: onStart) }
+        )
     }
+
+    static func route(_ slot: Slot, selection: inout MainTab, onStart: () -> Void) {
+        switch slot {
+        case .screen(let tab): selection = tab
+        case .start: onStart()
+        }
+    }
+}
+
+/// What the Start tab says.
+struct StartInfo: Equatable {
+    let title: String
 }
 
 extension HomeViewModel {
-    /// What the Start button says, or nil when there's no routine to start.
-    var startInfo: MainBar.StartInfo? {
+    /// What the Start tab says, or nil when there's no routine to start.
+    var startInfo: StartInfo? {
         guard hasRoutine else { return nil }
-        return MainBar.StartInfo(
-            title: isDoneToday ? "Start again" : "Start session",
-            detail: "\(rows.count) EX — \(estimatedMinutes) MIN"
-        )
-    }
-}
-
-/// The tab switcher and, when there's a routine, the Start button, in one row of glass.
-struct MainBar: View {
-    struct StartInfo: Equatable {
-        let title: String
-        let detail: String
-    }
-
-    @Binding var selection: MainTab
-    let start: StartInfo?
-    let onStart: () -> Void
-    @Environment(\.appAccent) private var accent
-
-    var body: some View {
-        GlassEffectContainer(spacing: 10) {
-            HStack(spacing: 10) {
-                tabs
-                if let start {
-                    startButton(start)
-                } else {
-                    Spacer(minLength: 0)
-                }
-            }
-        }
-    }
-
-    private var tabs: some View {
-        HStack(spacing: 2) {
-            tab(.today, title: "Today", systemImage: "sun.max")
-            tab(.progress, title: "Progress", systemImage: "chart.bar.xaxis")
-        }
-        .padding(4)
-        .glassEffect(.regular.interactive(), in: Capsule())
-    }
-
-    private func tab(_ value: MainTab, title: String, systemImage: String) -> some View {
-        let isSelected = selection == value
-        return Button {
-            selection = value
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 18, weight: .semibold))
-                Text(title)
-                    .font(AppFont.display(11, weight: .semibold))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(AppColor.ink)
-            .frame(minWidth: 64, minHeight: 52)
-            .padding(.horizontal, 4)
-            .background {
-                if isSelected {
-                    Capsule().fill(AppColor.ink.opacity(0.1))
-                }
-            }
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
-    }
-
-    private func startButton(_ start: StartInfo) -> some View {
-        Button(action: onStart) {
-            HStack(spacing: 10) {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(AppColor.onAccent)
-                    .frame(width: 40, height: 40)
-                    .background(accent, in: Circle())
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(start.title)
-                        .font(AppFont.display(16, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text(start.detail)
-                        .font(AppFont.mono(10))
-                        .tracking(0.6)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .opacity(0.75)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, 12)
-        }
-        .buttonStyle(InkGlassButtonStyle())
-        .accessibilityLabel(start.title)
-        .accessibilityValue(start.detail.lowercased())
+        return StartInfo(title: isDoneToday ? "Start again" : "Start session")
     }
 }
