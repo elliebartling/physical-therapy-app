@@ -10,6 +10,8 @@ final class ProgressViewModelTests: XCTestCase {
     private var routineRepo: RoutineRepository!
     private var sessionRepo: SessionRepository!
     private var routine: Routine!
+    private var defaults: UserDefaults!
+    private var suiteName = ""
 
     private let calendar = Calendar.current
     private func day(_ d: Int, month: Int = 11, hour: Int = 9, minute: Int = 0) -> Date {
@@ -28,14 +30,17 @@ final class ProgressViewModelTests: XCTestCase {
             Exercise(name: "Wall sit", target: .timeSets(seconds: 30, sets: 3), restSeconds: 30, side: .both, order: 1),
         ])
         try routineRepo.save(routine)
+        suiteName = "ProgressViewModelTests-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)
     }
 
     override func tearDown() async throws {
-        routine = nil; sessionRepo = nil; routineRepo = nil; container = nil
+        defaults.removePersistentDomain(forName: suiteName)
+        routine = nil; sessionRepo = nil; routineRepo = nil; container = nil; defaults = nil
     }
 
     private func viewModel() -> ProgressViewModel {
-        let vm = ProgressViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo, today: today)
+        let vm = ProgressViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo, defaults: defaults, today: today)
         vm.refresh()
         return vm
     }
@@ -76,7 +81,7 @@ final class ProgressViewModelTests: XCTestCase {
 
         let vm = viewModel()
 
-        XCTAssertEqual(vm.weeks.count, ProgressViewModel.weeksShown)
+        XCTAssertEqual(vm.weeks.count, 13, "three months by default")
         XCTAssertEqual(vm.activeDays, 2)
         XCTAssertEqual(vm.streak, 2)
     }
@@ -161,5 +166,151 @@ final class ProgressViewModelTests: XCTestCase {
         let older = try XCTUnwrap(vm.months.first?.sessions.last)
         XCTAssertTrue(older.items.map(\.name).contains("Wall sit"))
         XCTAssertNotEqual(oldBridges.id, newBridges.id)
+    }
+
+    // MARK: Analytics
+
+    /// A guided session where each exercise got the given rating, with optional pain.
+    @discardableResult
+    private func rated(on date: Date, _ ratings: KeyValuePairs<Exercise, ExerciseRating?>, pain: Int? = nil,
+                       note: String? = nil) throws -> SessionRecord {
+        let end = date.addingTimeInterval(10 * 60)
+        let records = ratings.map { exercise, rating in
+            let record = ExerciseRecord(exerciseID: exercise.id, status: .completed, startedAt: date, completedAt: end)
+            record.rating = rating
+            return record
+        }
+        let session = SessionRecord(routineID: routine.id, startedAt: date, completedAt: end, exerciseRecords: records)
+        session.painLevel = pain
+        session.note = note
+        try sessionRepo.insert(session)
+        return session
+    }
+
+    func test_range_changesTheWeeksCovered_andTheHeatmapStaysLegible() throws {
+        try guided(start: day(1, month: 1), minutes: 10, done: [bridges])
+        let vm = viewModel()
+
+        vm.range = .fourWeeks
+        XCTAssertEqual(vm.weeks.count, 4)
+        XCTAssertEqual(vm.heatmap.count, 4)
+
+        vm.range = .all
+        XCTAssertGreaterThan(vm.weeks.count, 40, "back to the first session in January")
+        XCTAssertEqual(vm.heatmap.count, 26, "the heatmap caps at half a year")
+    }
+
+    func test_weeklyGoal_drivesTheHeadline_andIsRemembered() throws {
+        try guided(start: day(9), minutes: 10, done: [bridges, wallSit])    // Monday
+        try guided(start: day(10), minutes: 10, done: [bridges, wallSit])
+        let vm = viewModel()
+        XCTAssertEqual(vm.weeklyGoal, ProgressViewModel.defaultWeeklyGoal)
+        XCTAssertEqual(vm.daysThisWeek, 2)
+
+        vm.weeklyGoal = 2
+        XCTAssertEqual(vm.goalStatus, .met)
+        XCTAssertEqual(viewModel().weeklyGoal, 2, "remembered for next time")
+
+        vm.weeklyGoal = 7
+        if case .behind(let remaining) = vm.goalStatus {
+            XCTAssertEqual(remaining, 5)
+        } else if vm.goalStatus != .onTrack {
+            XCTFail("2 of 7 can't be met yet")
+        }
+    }
+
+    func test_minutesAndPain_coverTheRange() throws {
+        try rated(on: day(20, month: 10), [bridges: nil], pain: 5)
+        try rated(on: day(5), [bridges: nil], pain: 3)
+        try logged(at: day(9, hour: 12), done: [bridges], skipped: [])
+
+        let vm = viewModel()
+
+        XCTAssertEqual(vm.minutes, 20, "two timed sessions; the logged one has no minutes")
+        XCTAssertEqual(vm.painNow, 3)
+        XCTAssertEqual(vm.painFrom, 5)
+        XCTAssertEqual(vm.painPoints.map(\.level), [5, 3])
+    }
+
+    func test_anExerciseRatedHardLately_isWorthTellingYourPT() throws {
+        try rated(on: day(2), [bridges: .aboutRight, wallSit: .aboutRight])
+        try rated(on: day(4), [bridges: .aboutRight, wallSit: .aboutRight])
+        try rated(on: day(6), [bridges: .hard, wallSit: .aboutRight])
+        try rated(on: day(8), [bridges: .painful, wallSit: .easy])
+        try rated(on: day(10), [bridges: .hard, wallSit: .aboutRight])
+
+        let vm = viewModel()
+
+        let row = try XCTUnwrap(vm.exercise(id: bridges.id))
+        XCTAssertEqual(row.trend, .harder(count: 3, of: 4, before: .aboutRight))
+        XCTAssertEqual(row.recent, [.rated(.aboutRight), .rated(.aboutRight), .rated(.hard), .rated(.painful), .rated(.hard)])
+        let insight = try XCTUnwrap(vm.insight(forExercise: bridges.id))
+        XCTAssertEqual(insight.title, "Bridges — Harder lately")
+        XCTAssertEqual(insight.detail, "Rated hard or painful 3 of the last 4 times, after mostly “about right”.")
+        XCTAssertNil(vm.insight(forExercise: wallSit.id))
+        XCTAssertEqual(ProgressViewModel.flag(for: .harder(count: 3, of: 4, before: nil)), "↑ Harder")
+    }
+
+    func test_painGoingDown_isWorthTellingYourPT() throws {
+        try rated(on: day(14, month: 10), [bridges: nil], pain: 5)
+        try rated(on: day(20, month: 10), [bridges: nil], pain: 4)
+        try rated(on: day(2), [bridges: nil], pain: 2)
+        try rated(on: day(10), [bridges: nil], pain: 1)
+
+        let vm = viewModel()
+
+        let pain = try XCTUnwrap(vm.insights.first { $0.exerciseID == nil })
+        XCTAssertEqual(pain.title, "Pain — down")
+        XCTAssertEqual(pain.detail, "Average pain after sessions was 1.5 over the last two weeks, down from 4.5 the four weeks before.")
+    }
+
+    func test_marks_showSkippedAndUnratedTimes() throws {
+        try logged(at: day(9, hour: 12), done: [bridges], skipped: [wallSit])
+        try rated(on: day(10), [wallSit: .easy])
+
+        let vm = viewModel()
+
+        XCTAssertEqual(vm.marks(forExercise: wallSit.id, count: 12), [.skipped, .rated(.easy)])
+        XCTAssertEqual(vm.marks(forExercise: bridges.id, count: 12), [.done])
+        XCTAssertEqual(MarkStrip.spoken([.skipped, .rated(.easy), .done]), "Last 3 times: 1 easy, 1 not rated, 1 skipped")
+    }
+
+    func test_phases_showWhatWasPrescribedEachTime() throws {
+        try guided(start: day(2), minutes: 10, done: [bridges])
+        try routineRepo.replaceActive(with: Routine(name: "Knee", exercises: [
+            Exercise(name: "Bridges", target: .repsSets(reps: 15, sets: 3), restSeconds: 30, side: .both, order: 0),
+        ]))
+        let newBridges = try XCTUnwrap(routineRepo.fetchActive()?.orderedExercises.first)
+        try sessionRepo.insert(SessionRecord(routineID: UUID(), startedAt: day(10), completedAt: day(10), exerciseRecords: [
+            ExerciseRecord(exerciseID: newBridges.id, status: .completed, startedAt: day(10), completedAt: day(10))
+        ]))
+
+        let vm = viewModel()
+
+        let phases = vm.phases(forExercise: newBridges.id)
+        XCTAssertEqual(phases.map(\.prescription), ["3×10", "3×15"])
+        XCTAssertEqual(phases.map(\.number), [1, 2])
+        XCTAssertNotNil(phases.first?.end)
+        XCTAssertNil(phases.last?.end, "the current phase is open-ended")
+        XCTAssertEqual(vm.entries(forExercise: newBridges.id).map(\.prescription), ["3×15", "3×10"])
+    }
+
+    func test_visitSummary_coversTheRangeForYourPT() throws {
+        try rated(on: day(6), [bridges: .hard, wallSit: .aboutRight], pain: 4)
+        try rated(on: day(8), [bridges: .painful, wallSit: .aboutRight], pain: 3, note: "Left hip clicks on the way up")
+        try rated(on: day(10), [bridges: .hard, wallSit: .easy], pain: 2)
+
+        let vm = viewModel()
+        vm.range = .fourWeeks
+        let summary = vm.visitSummary()
+
+        XCTAssertTrue(summary.hasPrefix("PT summary — Knee"))
+        XCTAssertTrue(summary.contains("3 days with a full session in 4 weeks (goal 5 a week"))
+        XCTAssertTrue(summary.contains("30 minutes of guided sessions"))
+        XCTAssertTrue(summary.contains("• Latest 2, first in this period 4 (3 readings)"))
+        XCTAssertTrue(summary.contains("• Bridges — Harder lately: Rated hard or painful 3 of the last 3 times."))
+        XCTAssertTrue(summary.contains("• Bridges (3×10): done 3. Felt: 2 hard, 1 painful"))
+        XCTAssertTrue(summary.contains("• Wall sit (3×30s): done 3. Felt: 1 easy, 2 about right"))
+        XCTAssertTrue(summary.contains("Left hip clicks on the way up"))
     }
 }
