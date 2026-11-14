@@ -6,9 +6,9 @@ final class FoundationModelsExtractorTests: XCTestCase {
     func test_dtoMapping_repsBased() {
         let dto = GenerableExercise(
             name: "Squats", reps: 10, sets: 3, durationSec: nil,
-            restSec: 45, side: "left", notes: "slow tempo"
+            restSec: 45, side: "left", notes: "slow tempo", sheetHowTo: []
         )
-        let ex = dto.toParsedExercise()
+        let ex = dto.toParsedExercise(source: "")
         XCTAssertEqual(ex.name, "Squats")
         XCTAssertEqual(ex.reps, 10)
         XCTAssertEqual(ex.sets, 3)
@@ -21,9 +21,9 @@ final class FoundationModelsExtractorTests: XCTestCase {
     func test_dtoMapping_timeBased_andRoutineName() {
         let dto = GenerableRoutine(name: "Knee rehab", exercises: [
             GenerableExercise(name: "Plank", reps: nil, sets: 2, durationSec: 30,
-                              restSec: 30, side: "both", notes: "")
+                              restSec: 30, side: "both", notes: "", sheetHowTo: [])
         ])
-        let parsed = dto.toParsedRoutine()
+        let parsed = dto.toParsedRoutine(source: "")
         XCTAssertEqual(parsed.name, "Knee rehab")
         XCTAssertEqual(parsed.exercises[0].durationSec, 30)
         XCTAssertNil(parsed.exercises[0].reps)
@@ -31,8 +31,92 @@ final class FoundationModelsExtractorTests: XCTestCase {
 
     func test_dtoMapping_invalidSide_normalizesToBoth() {
         let dto = GenerableExercise(name: "X", reps: 5, sets: 1, durationSec: nil,
-                                    restSec: 0, side: "EACH SIDE??", notes: "")
-        XCTAssertEqual(dto.toParsedExercise().side, "both")
+                                    restSec: 0, side: "EACH SIDE??", notes: "", sheetHowTo: [])
+        XCTAssertEqual(dto.toParsedExercise(source: "").side, "both")
+    }
+
+    private static let sheet = """
+    Slant board stretch
+    Setup \u{2014} Begin by standing behind a slant board.
+    Tip \u{2014} You can hold onto a wall or pole for balance as needed.  Keep your
+    heels down on the slant board.
+    """
+
+    private func exercise(_ sections: [GenerableHowToSection]) -> GenerableExercise {
+        GenerableExercise(name: "X", reps: 5, sets: 1, durationSec: nil, restSec: 0,
+                          side: "both", notes: "", sheetHowTo: sections)
+    }
+
+    func test_sections_presentOnTheSheet_areKeptVerbatimInOrder() {
+        let ex = exercise([
+            GenerableHowToSection(heading: "Setup", body: "Begin by standing behind a slant board."),
+            GenerableHowToSection(heading: "Tip", body: "You can hold onto a wall or pole for balance as needed."),
+        ]).toParsedExercise(source: Self.sheet)
+        XCTAssertEqual(ex.sheetHowTo.map(\.heading), ["Setup", "Tip"])
+        XCTAssertEqual(ex.sheetHowTo.first?.body, "Begin by standing behind a slant board.")
+        XCTAssertEqual(ex.notes, "", "sheet prose must not reach notes")
+    }
+
+    func test_sections_matchAcrossCaseWhitespaceAndSmartQuotes() {
+        let source = "Tip \u{2014} Don\u{2019}t let your knee\ncollapse inward."
+        let ex = exercise([
+            GenerableHowToSection(heading: "tip", body: "DON'T let your knee collapse   inward."),
+        ]).toParsedExercise(source: source)
+        XCTAssertEqual(ex.sheetHowTo.count, 1)
+    }
+
+    func test_sections_matchPDFLigaturesInTheSource() {
+        let source = "Tip \u{2014} You can \u{FB01}nd the \u{FB02}at part of the board."
+        let ex = exercise([
+            GenerableHowToSection(heading: "Tip", body: "You can find the flat part of the board."),
+        ]).toParsedExercise(source: source)
+        XCTAssertEqual(ex.sheetHowTo.map(\.body), ["You can find the flat part of the board."])
+    }
+
+    func test_sections_matchHyphenatedLineBreaksAndSoftHyphens() {
+        let source = "Setup \u{2014} Begin by stand-\ning behind a sl\u{00AD}ant board."
+        let ex = exercise([
+            GenerableHowToSection(heading: "Setup", body: "Begin by standing behind a slant board."),
+        ]).toParsedExercise(source: source)
+        XCTAssertEqual(ex.sheetHowTo.count, 1)
+    }
+
+    func test_sections_aRealHyphenInsideALineIsNotJoined() {
+        let source = "Tip \u{2014} Keep a well-known stance."
+        let ex = exercise([
+            GenerableHowToSection(heading: "Tip", body: "Keep a wellknown stance."),
+        ]).toParsedExercise(source: source)
+        XCTAssertEqual(ex.sheetHowTo, [])
+    }
+
+    func test_sections_nearParaphrase_isDropped() {
+        let ex = exercise([
+            GenerableHowToSection(heading: "Setup", body: "Start by standing in front of a slant board."),
+        ]).toParsedExercise(source: Self.sheet)
+        XCTAssertEqual(ex.sheetHowTo, [])
+    }
+
+    func test_sections_whollyInvented_isDropped() {
+        let ex = exercise([
+            GenerableHowToSection(heading: "Movement", body: "Keep your back straight and breathe out."),
+            GenerableHowToSection(heading: "Tip", body: "Keep your heels down on the slant board."),
+        ]).toParsedExercise(source: Self.sheet)
+        XCTAssertEqual(ex.sheetHowTo.map(\.heading), ["Tip"])
+    }
+
+    func test_sections_headingNotOnTheSheet_isBlankedButVerbatimBodyKept() {
+        let ex = exercise([
+            GenerableHowToSection(heading: "Important safety", body: "Begin by standing behind a slant board."),
+        ]).toParsedExercise(source: Self.sheet)
+        XCTAssertEqual(ex.sheetHowTo.map(\.heading), [""])
+        XCTAssertEqual(ex.sheetHowTo.map(\.body), ["Begin by standing behind a slant board."])
+    }
+
+    func test_sections_emptyBody_isDropped() {
+        let ex = exercise([
+            GenerableHowToSection(heading: "Tip", body: "  "),
+        ]).toParsedExercise(source: Self.sheet)
+        XCTAssertEqual(ex.sheetHowTo, [])
     }
 
     func test_isAvailable_returnsWithoutCrashing() {

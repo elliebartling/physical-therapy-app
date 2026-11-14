@@ -28,6 +28,10 @@ public final class ProgressViewModel {
         /// The last few times it came up, oldest first.
         public let recent: [Mark]
         public let trend: ExerciseTrend?
+        /// Read from the live exercise; rows exist only for the active routine, so it is always known.
+        public let art: ArtChoice
+        /// The handout's own instruction text, in sheet order.
+        public let sheetHowTo: [HowToSection]
     }
 
     public struct SessionItem: Identifiable, Equatable {
@@ -269,7 +273,9 @@ public final class ProgressViewModel {
                 trend: ProgressStats.trend(
                     newestFirst: history.map { RatedEntry(date: $0.date, isDone: $0.isDone, rating: $0.rating) },
                     today: today, calendar: calendar
-                )
+                ),
+                art: exercise.art,
+                sheetHowTo: exercise.sheetHowTo
             )
         }
 

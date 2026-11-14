@@ -7,11 +7,19 @@ public enum AppFont {
     public static func mono(_ size: CGFloat, weight: Weight = .regular) -> Font {
         let name: String
         switch weight {
-        case .regular: name = "JetBrainsMono-Regular"
+        case .regular: name = Self.monoRegularName
         case .medium:  name = "JetBrainsMono-Medium"
         case .bold:    name = "JetBrainsMono-Bold"
         }
         return Font.custom(name, fixedSize: size).monospacedDigit()
+    }
+
+    static let monoRegularName = "JetBrainsMono-Regular"
+
+    /// Regular mono that scales with Dynamic Type relative to a text style.
+    /// A sibling of `mono`, which stays fixed-size.
+    static func scalingMono(_ size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
+        Font.custom(monoRegularName, size: size, relativeTo: style)
     }
 
     /// Titles, numbers and names: the system grotesk, set tight at the call site.

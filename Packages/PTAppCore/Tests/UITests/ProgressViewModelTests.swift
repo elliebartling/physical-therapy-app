@@ -66,6 +66,32 @@ final class ProgressViewModelTests: XCTestCase {
         return record
     }
 
+    func test_exerciseRowCarriesTheSheetHowTo() throws {
+        let section = HowToSection(heading: "Tip", body: "Keep your heels down.")
+        bridges.sheetHowTo = [section]
+        try routineRepo.save(routine)
+        let vm = viewModel()
+        XCTAssertEqual(vm.exercise(id: bridges.id)?.sheetHowTo, [section])
+        XCTAssertEqual(vm.exercise(id: wallSit.id)?.sheetHowTo, [])
+    }
+
+    func test_exerciseRowCarriesItsArt() throws {
+        bridges.art = .library(slug: "bird-dog")
+        try routineRepo.save(routine)
+        let vm = viewModel()
+        XCTAssertEqual(vm.exercise(id: bridges.id)?.art, .library(slug: "bird-dog"))
+        XCTAssertEqual(vm.exercise(id: wallSit.id)?.art, .unmatched)
+    }
+
+    func test_exerciseFromAnEarlierPhase_hasNoRowToReadArtFrom() throws {
+        let retired = Exercise(name: "Old", target: .repsSets(reps: 5, sets: 1), restSeconds: 0, side: .both, order: 0,
+                               art: .library(slug: "bird-dog"))
+        let old = Routine(name: "Earlier", exercises: [retired])
+        old.isActive = false
+        try routineRepo.save(old)
+        XCTAssertNil(viewModel().exercise(id: retired.id))
+    }
+
     func test_noSessions_showsTheEmptyState_withExercisesNotDoneYet() {
         let vm = viewModel()
         XCTAssertFalse(vm.hasSessions)

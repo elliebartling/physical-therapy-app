@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "ParsingKit", targets: ["ParsingKit"]),
         .library(name: "SessionKit", targets: ["SessionKit"]),
         .library(name: "HistoryKit", targets: ["HistoryKit"]),
+        .library(name: "MediaKit", targets: ["MediaKit"]),
         .library(name: "UI", targets: ["UI"]),
     ],
     dependencies: [
@@ -23,11 +24,18 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(name: "HistoryKit", dependencies: ["DataKit"]),
-        .target(name: "UI", dependencies: ["DataKit", "ParsingKit", "SessionKit", "HistoryKit"]),
+        .target(
+            name: "MediaKit",
+            dependencies: ["DataKit"],
+            exclude: ["Resources/generate-catalog.sh"],
+            resources: [.process("Resources")]
+        ),
+        .target(name: "UI", dependencies: ["DataKit", "ParsingKit", "SessionKit", "HistoryKit", "MediaKit"]),
         .testTarget(name: "DataKitTests", dependencies: ["DataKit"]),
         .testTarget(name: "ParsingKitTests", dependencies: ["ParsingKit"], resources: [.process("Fixtures")]),
         .testTarget(name: "SessionKitTests", dependencies: ["SessionKit"]),
         .testTarget(name: "HistoryKitTests", dependencies: ["HistoryKit"]),
+        .testTarget(name: "MediaKitTests", dependencies: ["MediaKit"]),
         .testTarget(
             name: "UITests",
             dependencies: [

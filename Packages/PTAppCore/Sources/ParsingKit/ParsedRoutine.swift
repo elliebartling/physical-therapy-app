@@ -11,8 +11,11 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
         public var restSec: Int
         public var side: String
         public var notes: String
+        public var art: ArtChoice
+        /// The handout's own instruction prose; never merged into `notes`.
+        public var sheetHowTo: [HowToSection]
 
-        public init(id: UUID = UUID(), name: String, reps: Int?, sets: Int, durationSec: Int?, restSec: Int, side: String, notes: String) {
+        public init(id: UUID = UUID(), name: String, reps: Int?, sets: Int, durationSec: Int?, restSec: Int, side: String, notes: String, art: ArtChoice = .unmatched, sheetHowTo: [HowToSection] = []) {
             self.id = id
             self.name = name
             self.reps = reps
@@ -21,10 +24,12 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
             self.restSec = restSec
             self.side = side
             self.notes = notes
+            self.art = art
+            self.sheetHowTo = sheetHowTo
         }
 
         private enum CodingKeys: String, CodingKey {
-            case id, name, reps, sets, durationSec, restSec, side, notes
+            case id, name, reps, sets, durationSec, restSec, side, notes, art, sheetHowTo
         }
 
         public init(from decoder: Decoder) throws {
@@ -37,6 +42,8 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
             self.restSec = try c.decode(Int.self, forKey: .restSec)
             self.side = try c.decode(String.self, forKey: .side)
             self.notes = try c.decode(String.self, forKey: .notes)
+            self.art = (try? c.decode(ArtChoice.self, forKey: .art)) ?? .unmatched
+            self.sheetHowTo = (try? c.decode([HowToSection].self, forKey: .sheetHowTo)) ?? []
         }
     }
 
@@ -63,7 +70,9 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
                 restSeconds: p.restSec,
                 side: side,
                 notes: p.notes,
-                order: idx
+                order: idx,
+                art: p.art,
+                sheetHowTo: p.sheetHowTo
             )
         }
         return Routine(name: name, exercises: mapped)

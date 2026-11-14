@@ -11,6 +11,7 @@ public final class HomeViewModel {
         public let number: String
         public let name: String
         public let prescription: String
+        public let art: ArtChoice
     }
 
     private let routineRepo: RoutineRepository
@@ -59,7 +60,8 @@ public final class HomeViewModel {
                 id: exercise.id,
                 number: String(format: "%02d", index + 1),
                 name: exercise.name,
-                prescription: Prescription.text(target: exercise.target, side: exercise.side)
+                prescription: Prescription.text(target: exercise.target, side: exercise.side),
+                art: exercise.art
             )
         }
         estimatedMinutes = SessionEstimate.minutes(for: exercises)

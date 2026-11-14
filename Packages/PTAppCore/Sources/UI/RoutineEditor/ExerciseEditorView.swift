@@ -1,6 +1,7 @@
 import SwiftUI
 import ParsingKit
 import DataKit
+import MediaKit
 
 public struct ExerciseEditorView: View {
     @Binding public var exercise: ParsedRoutine.ParsedExercise
@@ -11,8 +12,14 @@ public struct ExerciseEditorView: View {
     }
 
     @State private var kind: Kind
+    private let imported: ImportedSuggestions?
 
     public init(exercise: Binding<ParsedRoutine.ParsedExercise>) {
+        self.init(exercise: exercise, imported: nil)
+    }
+
+    init(exercise: Binding<ParsedRoutine.ParsedExercise>, imported: ImportedSuggestions?) {
+        self.imported = imported
         self._exercise = exercise
         self._kind = State(initialValue: exercise.wrappedValue.durationSec == nil ? .reps : .time)
     }
@@ -23,6 +30,9 @@ public struct ExerciseEditorView: View {
                 TextField("Name", text: $exercise.name, axis: .vertical)
                     .font(AppFont.display(18, weight: .semibold))
                     .lineLimit(1...4)
+            }
+            Section("Picture") {
+                PictureLink(exercise: $exercise, imported: imported)
             }
             Section("Target") {
                 Picker("Type", selection: $kind) {
@@ -66,5 +76,29 @@ public struct ExerciseEditorView: View {
         }
         .navigationTitle("Exercise")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// The current figure and a link to the picker.
+private struct PictureLink: View {
+    @Binding var exercise: ParsedRoutine.ParsedExercise
+    let imported: ImportedSuggestions?
+
+    var body: some View {
+        NavigationLink {
+            ArtPickerView(art: $exercise.art, exerciseName: exercise.name, notes: exercise.notes,
+                          matcher: .init(),
+                          initialSuggestions: imported?.entries(forName: exercise.name,
+                                                                notes: exercise.notes) ?? [])
+        } label: {
+            HStack(spacing: 14) {
+                ExerciseFigure(art: exercise.art)
+                    .frame(width: 72, height: 72)
+                Text("Change picture")
+                    .font(AppFont.display(16, weight: .medium))
+            }
+            .frame(minHeight: 72)
+        }
+        .accessibilityValue(ArtPickerView.pictureDescription(for: exercise.art))
     }
 }
