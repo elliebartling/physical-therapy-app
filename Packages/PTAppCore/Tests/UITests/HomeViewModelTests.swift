@@ -68,12 +68,25 @@ final class HomeViewModelTests: XCTestCase {
         ]))
         let vm = HomeViewModel(routineRepo: routineRepo, sessionRepo: sessionRepo, today: today)
         await vm.refresh()
-        XCTAssertEqual(vm.startInfo, MainBar.StartInfo(title: "Start session", detail: "1 EX — 1 MIN"))
+        XCTAssertEqual(vm.startInfo, StartInfo(title: "Start session"))
 
         try sessionRepo.insert(SessionRecord(routineID: UUID(), startedAt: today, completedAt: today))
         await vm.refresh()
         XCTAssertEqual(vm.startInfo?.title, "Start again")
 
         _ = container
+    }
+
+    func test_choosingStart_startsASession_andKeepsTheScreen() {
+        var selection = MainTab.progress
+        var started = 0
+
+        MainTabsView.route(.start, selection: &selection) { started += 1 }
+        XCTAssertEqual(started, 1)
+        XCTAssertEqual(selection, .progress, "Start opens a session, not a screen")
+
+        MainTabsView.route(.screen(.today), selection: &selection) { started += 1 }
+        XCTAssertEqual(selection, .today)
+        XCTAssertEqual(started, 1)
     }
 }
