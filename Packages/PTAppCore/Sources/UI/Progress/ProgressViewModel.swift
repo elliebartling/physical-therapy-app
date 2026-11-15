@@ -11,11 +11,23 @@ private let logger = Logger(subsystem: "PTAppCore", category: "progress")
 @MainActor
 @Observable
 public final class ProgressViewModel {
-    /// One time an exercise came up, as a small square: its rating, done without one, or skipped.
+    /// One time an exercise came up, as a small square: its rating, done without one,
+    /// covered by another workout, or skipped.
     public enum Mark: Equatable, Sendable {
         case rated(ExerciseRating)
         case done
+        case covered
         case skipped
+    }
+
+    /// One kind of workout from outside Mend, with what it covers and how pain follows it.
+    public struct ActivityRow: Identifiable, Equatable {
+        public let summary: ActivitySummary
+        /// Exercises in the current routine it's set to cover.
+        public let covers: Int
+        public let nextDayPain: NextDayPain?
+        public var id: UInt { summary.activity.id }
+        public var activity: WorkoutActivity { summary.activity }
     }
 
     public struct ExerciseRow: Identifiable, Equatable {
@@ -35,6 +47,8 @@ public final class ProgressViewModel {
         public let name: String
         public let isDone: Bool
         public let rating: ExerciseRating?
+        /// The other workout that stood in for it, e.g. "Yoga".
+        public let coveredBy: String?
     }
 
     public struct SessionRow: Identifiable, Equatable {
@@ -63,9 +77,12 @@ public final class ProgressViewModel {
         public let rating: ExerciseRating?
         /// What was prescribed at the time.
         public let prescription: String?
+        /// The other workout that stood in for it, e.g. "Yoga".
+        public let coveredBy: String?
 
         var mark: Mark {
             guard isDone else { return .skipped }
+            if coveredBy != nil { return .covered }
             return rating.map(Mark.rated) ?? .done
         }
     }
@@ -130,6 +147,11 @@ public final class ProgressViewModel {
     public private(set) var painFrom: Int?
     public private(set) var insights: [Insight] = []
 
+    // From outside Mend
+    /// Workouts from Apple Health in the range, newest first.
+    public private(set) var otherWorkouts: [OtherWorkout] = []
+    public private(set) var activities: [ActivityRow] = []
+
     // Lists
     public private(set) var exercises: [ExerciseRow] = []
     public private(set) var months: [Month] = []
@@ -140,13 +162,22 @@ public final class ProgressViewModel {
     private var goal: Int { min(max(weeklyGoal, 1), 7) }
     public var sessionCount: Int { sessions.count }
     public var routineName: String? { routines.first(where: \.isActive)?.name }
+    /// Where other workouts and what they cover come from; nil when not offered.
+    public let otherWorkoutsSource: OtherWorkoutsSource?
+    /// The current routine's exercises, for saying what a workout covers.
+    public var coverableExercises: [CoverableExercise] {
+        CoverableExercise.all(in: routines.first(where: \.isActive))
+    }
 
     private let routineRepo: RoutineRepository
     private let sessionRepo: SessionRepository
     private let defaults: UserDefaults
-    private let today: Date
+    /// Fixed in tests; otherwise read fresh, since Progress stays alive across midnight.
+    private let fixedToday: Date?
+    private var today: Date { fixedToday ?? .now }
     private let calendar: Calendar
     private var sessions: [SessionRecord] = []
+    private var allOtherWorkouts: [OtherWorkout] = []
     private var routines: [Routine] = []
     private var names: [UUID: String] = [:]
     private var order: [UUID: Int] = [:]
@@ -155,11 +186,13 @@ public final class ProgressViewModel {
     private var lineage: [UUID: UUID] = [:]
 
     public init(routineRepo: RoutineRepository, sessionRepo: SessionRepository,
-                defaults: UserDefaults = .standard, today: Date = .now, calendar: Calendar = .current) {
+                defaults: UserDefaults = .standard, otherWorkouts: OtherWorkoutsSource? = OtherWorkoutsSource(),
+                today: Date? = nil, calendar: Calendar = .current) {
         self.routineRepo = routineRepo
         self.sessionRepo = sessionRepo
         self.defaults = defaults
-        self.today = today
+        self.otherWorkoutsSource = otherWorkouts
+        self.fixedToday = today
         self.calendar = calendar
         let stored = defaults.integer(forKey: Self.weeklyGoalKey)
         self.weeklyGoal = (1...7).contains(stored) ? stored : Self.defaultWeeklyGoal
@@ -177,6 +210,20 @@ public final class ProgressViewModel {
         }
     }
 
+    /// Reads other workouts from Apple Health, far enough back for every range.
+    public func loadOtherWorkouts() async {
+        guard let otherWorkoutsSource, otherWorkoutsSource.isOn else {
+            allOtherWorkouts = []
+            buildRange()
+            return
+        }
+        let quarterAgo = calendar.date(byAdding: .weekOfYear, value: -13, to: today) ?? today
+        let earliest = min(firstSessionDate ?? quarterAgo, quarterAgo)
+        let from = calendar.dateInterval(of: .weekOfYear, for: earliest)?.start ?? earliest
+        allOtherWorkouts = await otherWorkoutsSource.workouts(from: from, to: today)
+        buildRange()
+    }
+
     /// Every time the exercise came up, in this phase or earlier ones, newest first.
     public func entries(forExercise id: UUID) -> [ExerciseEntry] {
         let group = lineage[id] ?? id
@@ -185,7 +232,7 @@ public final class ProgressViewModel {
             .filter { (lineage[$0.exerciseID] ?? $0.exerciseID) == group }
             .map { ExerciseEntry(id: $0.id, date: $0.completedAt ?? $0.startedAt,
                                  isDone: $0.status == .completed, rating: $0.rating,
-                                 prescription: prescriptions[$0.exerciseID]) }
+                                 prescription: prescriptions[$0.exerciseID], coveredBy: $0.coveredBy) }
             .sorted { $0.date > $1.date }
     }
 
@@ -297,13 +344,26 @@ public final class ProgressViewModel {
         let start = weeks.first?.weekStart ?? today
         let inRange = sessions.filter { $0.startedAt >= start }
         minutes = inRange.compactMap(ProgressStats.minutes(of:)).reduce(0, +)
+        otherWorkouts = allOtherWorkouts.filter { $0.start >= start }
         heatmap = ProgressStats.heatmap(in: sessions, weeks: min(count, Self.maxHeatmapWeeks), today: today,
+                                        otherWorkoutDays: OtherWorkoutStats.days(of: otherWorkouts, calendar: calendar),
                                         calendar: calendar)
         longestStreak = ProgressStats.longestStreak(in: sessions, from: start, through: today, calendar: calendar)
         painPoints = ProgressStats.painPoints(in: inRange)
         painNow = painPoints.last?.level
         painFrom = painPoints.count > 1 && painPoints.first?.level != painNow ? painPoints.first?.level : nil
         ratingWeeks = ProgressStats.weeklyRatings(in: sessions, weeks: count, today: today, calendar: calendar)
+        let activeLineages = Set(routines.first(where: \.isActive)?.exercises.map(\.lineageID) ?? [])
+        let rules = otherWorkoutsSource?.rules ?? []
+        activities = OtherWorkoutStats.summaries(of: otherWorkouts).map { summary in
+            let rule = rules.first { $0.activity.id == summary.activity.id }
+            return ActivityRow(
+                summary: summary,
+                covers: rule.map { $0.exerciseLineages.intersection(activeLineages).count } ?? 0,
+                nextDayPain: OtherWorkoutStats.nextDayPain(points: painPoints, workouts: otherWorkouts,
+                                                           activityID: summary.activity.id)
+            )
+        }
         insights = buildInsights()
     }
 
@@ -326,7 +386,66 @@ public final class ProgressViewModel {
                 exerciseID: nil
             ))
         }
+        for row in activities {
+            guard let pain = row.nextDayPain else { continue }
+            found.append(Insight(
+                id: "after-\(row.id)",
+                title: "\(row.activity.name) — \(pain.isHigher ? "more" : "less") pain after",
+                detail: "Pain after sessions averaged \(Self.format(pain.after)) within a day of "
+                    + "\(row.activity.name.lowercased()), \(Self.format(pain.otherwise)) otherwise "
+                    + "(\(pain.count) sessions).",
+                exerciseID: nil
+            ))
+        }
+        found += standIns(since: calendar.date(byAdding: .day, value: -28, to: calendar.startOfDay(for: today)) ?? today)
+            .filter { $0.times >= 2 }
+            .map { standIn in
+                Insight(
+                    id: "covers-\(standIn.workout)",
+                    title: "\(standIn.workout) — standing in",
+                    detail: "\(standIn.workout) counted for \(Self.list(standIn.exercises)) \(standIn.times) times "
+                        + "in the last four weeks. Worth checking with your PT that it covers them.",
+                    exerciseID: nil
+                )
+            }
         return found
+    }
+
+    /// Each workout that counted for exercises since `start`: how often, and for which exercises.
+    private func standIns(since start: Date) -> [(workout: String, times: Int, exercises: [String])] {
+        let covering = sessions.filter { $0.coveringWorkoutID != nil && $0.startedAt >= start }
+        let byWorkout = Dictionary(grouping: covering) { session in
+            session.exerciseRecords.compactMap(\.coveredBy).first ?? "Another workout"
+        }
+        return byWorkout.keys.sorted().map { workout in
+            let group = byWorkout[workout] ?? []
+            var seen: Set<String> = []
+            let exercises = group.flatMap(\.exerciseRecords)
+                .sorted { (order[$0.exerciseID] ?? .max) < (order[$1.exerciseID] ?? .max) }
+                .compactMap { names[$0.exerciseID] }
+                .filter { seen.insert($0).inserted }
+            return (workout, group.count, exercises)
+        }
+    }
+
+    /// "A", "A and B", "A, B and C".
+    static func list(_ items: [String]) -> String {
+        items.formatted(.list(type: .and))
+    }
+
+    /// "45 min", "1 h 30 min".
+    static func duration(minutes: Int) -> String {
+        let hours = minutes / 60
+        let rest = minutes % 60
+        if hours == 0 { return "\(rest) min" }
+        return rest == 0 ? "\(hours) h" : "\(hours) h \(rest) min"
+    }
+
+    /// "5.2 km".
+    static func distance(meters: Double) -> String {
+        Measurement(value: meters / 1000, unit: UnitLength.kilometers)
+            .formatted(.measurement(width: .abbreviated, usage: .asProvided,
+                                    numberFormatStyle: .number.precision(.fractionLength(0...1))))
     }
 
     static func copy(for trend: ExerciseTrend) -> (title: String, detail: String) {
@@ -367,7 +486,8 @@ public final class ProgressViewModel {
                 SessionItem(id: record.id,
                             name: names[record.exerciseID] ?? "Removed exercise",
                             isDone: record.status == .completed,
-                            rating: record.rating)
+                            rating: record.rating,
+                            coveredBy: record.coveredBy)
             }
         return SessionRow(id: session.id, date: session.startedAt,
                           isComplete: session.isComplete, minutes: ProgressStats.minutes(of: session), items: items,
@@ -430,6 +550,22 @@ public final class ProgressViewModel {
                     return n == 0 ? nil : "\(n) \(rating.title.lowercased())"
                 }
                 if !tally.isEmpty { line += ". Felt: " + tally.joined(separator: ", ") }
+                lines.append(line)
+            }
+        }
+
+        if !activities.isEmpty {
+            lines.append("")
+            lines.append("OTHER WORKOUTS (FROM APPLE HEALTH)")
+            let covering = standIns(since: start)
+            for row in activities {
+                var line = "• \(row.activity.name): \(row.summary.count) \(row.summary.count == 1 ? "time" : "times"), "
+                    + Self.duration(minutes: row.summary.minutes)
+                if let meters = row.summary.distanceMeters, meters > 0 { line += ", " + Self.distance(meters: meters) }
+                if let standIn = covering.first(where: { $0.workout == row.activity.name }) {
+                    line += ". Counted for \(Self.list(standIn.exercises)) \(standIn.times) "
+                        + (standIn.times == 1 ? "time" : "times")
+                }
                 lines.append(line)
             }
         }

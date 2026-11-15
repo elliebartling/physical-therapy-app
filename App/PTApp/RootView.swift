@@ -46,7 +46,13 @@ struct RootView: View {
             case .session:
                 if let routine = try? routineRepo.fetchActive() {
                     SessionView(
-                        viewModel: SessionViewModel(routine: routine, sessionRepo: sessionRepo),
+                        viewModel: SessionViewModel(
+                            routine: routine, sessionRepo: sessionRepo,
+                            // Exercises another workout covered today are left out.
+                            skipping: Set(OtherWorkoutStats.coveredExercises(
+                                on: .now, in: (try? sessionRepo.fetchAll()) ?? []
+                            ).keys)
+                        ),
                         onComplete: { record in
                             finishedSession = record
                             let sessions = (try? sessionRepo.fetchAll()) ?? []
@@ -72,7 +78,7 @@ struct RootView: View {
                 )
             case .settings:
                 SettingsView(
-                    viewModel: SettingsViewModel(),
+                    viewModel: SettingsViewModel(routineRepo: routineRepo),
                     onReplaceRoutine: { route = .setup },
                     onDone: { route = .home }
                 )

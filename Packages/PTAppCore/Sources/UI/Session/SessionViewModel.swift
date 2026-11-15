@@ -57,9 +57,10 @@ public final class SessionViewModel {
                 clock: Clock = SystemClock(), audio: AudioCueService? = AudioCueService(),
                 haptics: HapticService? = HapticService(),
                 health: HealthRecorder? = HealthRecorder(),
-                ratingTiming: RatingTiming = .load()) {
+                ratingTiming: RatingTiming = .load(),
+                skipping: Set<UUID> = []) {
         self.routine = routine
-        self.engine = SessionEngine(routine: routine, clock: clock)
+        self.engine = SessionEngine(routine: routine, clock: clock, skipping: skipping)
         self.sessionRepo = sessionRepo
         self.audio = audio
         self.haptics = haptics

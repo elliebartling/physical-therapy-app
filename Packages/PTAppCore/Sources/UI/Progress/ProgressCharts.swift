@@ -30,6 +30,8 @@ struct MarkSquare: View {
                 shape.fill(rating.color(accent: accent))
             case .done:
                 shape.strokeBorder(AppColor.ink.opacity(0.55), lineWidth: 1.5)
+            case .covered:
+                shape.strokeBorder(accent, lineWidth: 2)
             case .skipped:
                 shape.strokeBorder(AppColor.inkSecondary, style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
             }
@@ -60,6 +62,8 @@ struct MarkStrip: View {
         }
         let unrated = marks.filter { $0 == .done }.count
         if unrated > 0 { parts.append("\(unrated) not rated") }
+        let covered = marks.filter { $0 == .covered }.count
+        if covered > 0 { parts.append("\(covered) covered by another workout") }
         let skipped = marks.filter { $0 == .skipped }.count
         if skipped > 0 { parts.append("\(skipped) skipped") }
         return "Last \(marks.count) times: " + parts.joined(separator: ", ")
@@ -78,6 +82,7 @@ struct RatingLegend: View {
             }
             if showsMarks {
                 item("Not rated") { MarkSquare(mark: .done) }
+                item("Covered") { MarkSquare(mark: .covered) }
                 item("Skipped") { MarkSquare(mark: .skipped) }
             }
         }
@@ -111,7 +116,8 @@ struct ConsistencyHeatmap: View {
                             .foregroundStyle(AppColor.inkSecondary)
                             .frame(minWidth: 12, alignment: .leading)
                         ForEach(weeks) { week in
-                            cell(week.days.indices.contains(weekday) ? week.days[weekday] : .rest)
+                            cell(week.days.indices.contains(weekday) ? week.days[weekday] : .rest,
+                                 hasOther: week.others.indices.contains(weekday) && week.others[weekday])
                         }
                     }
                 }
@@ -132,12 +138,20 @@ struct ConsistencyHeatmap: View {
         .accessibilityLabel(summary)
     }
 
-    private func cell(_ state: DayState) -> some View {
+    private func cell(_ state: DayState, hasOther: Bool) -> some View {
         RoundedRectangle(cornerRadius: 2)
             .fill(fill(state))
             .overlay {
                 if state == .future {
                     RoundedRectangle(cornerRadius: 2).strokeBorder(AppColor.hairline, lineWidth: 1)
+                }
+            }
+            .overlay {
+                // A workout from outside Mend: a dot, dark on a done day so it shows on the accent.
+                if hasOther {
+                    Circle()
+                        .fill(state == .done ? AppColor.onAccent : AppColor.ink)
+                        .padding(5)
                 }
             }
             .aspectRatio(1, contentMode: .fit)
@@ -166,28 +180,46 @@ struct ConsistencyHeatmap: View {
         let partial = days.filter { $0 == .partial }.count
         var text = "Last \(weeks.count) weeks: \(done) \(done == 1 ? "day" : "days") done"
         if partial > 0 { text += ", \(partial) partly done" }
+        let others = weeks.flatMap(\.others).filter { $0 }.count
+        if others > 0 { text += ", \(others) \(others == 1 ? "day" : "days") with another workout" }
         return text
     }
 }
 
-/// Pain recorded after each session, 0 to 10.
+/// Pain recorded after each session, 0 to 10, with other workouts marked in a lane below.
 struct PainChart: View {
     let points: [PainPoint]
+    var workouts: [OtherWorkout] = []
+    @Environment(\.appAccent) private var accent
 
     var body: some View {
-        Chart(points) { point in
-            LineMark(x: .value("Date", point.date), y: .value("Pain", point.level))
-                .foregroundStyle(AppColor.ink)
-                .interpolationMethod(.monotone)
-            PointMark(x: .value("Date", point.date), y: .value("Pain", point.level))
-                .foregroundStyle(AppColor.ink)
-                .symbolSize(24)
+        Chart {
+            ForEach(workouts) { workout in
+                RectangleMark(
+                    x: .value("Day", workout.start, unit: .day),
+                    yStart: .value("Workout", -2.4),
+                    yEnd: .value("Workout", -0.9)
+                )
+                .foregroundStyle(accent)
+            }
+            ForEach(points) { point in
+                LineMark(x: .value("Date", point.date), y: .value("Pain", Double(point.level)))
+                    .foregroundStyle(AppColor.ink)
+                    .interpolationMethod(.monotone)
+                PointMark(x: .value("Date", point.date), y: .value("Pain", Double(point.level)))
+                    .foregroundStyle(AppColor.ink)
+                    .symbolSize(24)
+            }
         }
-        .chartYScale(domain: 0...10)
+        .chartYScale(domain: (workouts.isEmpty ? 0.0 : -2.5)...10.0)
         .chartYAxis {
-            AxisMarks(values: [0, 5, 10]) { _ in
+            AxisMarks(values: [0.0, 5.0, 10.0]) { value in
                 AxisGridLine().foregroundStyle(AppColor.hairline)
-                AxisValueLabel().font(AppFont.mono(10))
+                AxisValueLabel {
+                    if let level = value.as(Double.self) {
+                        Text("\(Int(level))").font(AppFont.mono(10))
+                    }
+                }
             }
         }
         .chartXAxis {
@@ -203,8 +235,10 @@ struct PainChart: View {
     private var summary: String {
         guard let first = points.first, let last = points.last else { return "No pain recorded" }
         let levels = points.map(\.level)
-        return "Pain after sessions, \(points.count) readings. First \(first.level), latest \(last.level), "
+        var text = "Pain after sessions, \(points.count) readings. First \(first.level), latest \(last.level), "
             + "lowest \(levels.min() ?? 0), highest \(levels.max() ?? 0), out of 10."
+        if !workouts.isEmpty { text += " \(workouts.count) other workouts marked below." }
+        return text
     }
 }
 

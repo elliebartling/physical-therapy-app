@@ -54,11 +54,14 @@ public enum DayState: Equatable, Sendable {
 public struct HeatmapWeek: Equatable, Sendable, Identifiable {
     public let weekStart: Date
     public let days: [DayState]
+    /// Days with a workout from outside Mend, in the same order as `days`.
+    public let others: [Bool]
     public var id: Date { weekStart }
 
-    public init(weekStart: Date, days: [DayState]) {
+    public init(weekStart: Date, days: [DayState], others: [Bool] = []) {
         self.weekStart = weekStart
         self.days = days
+        self.others = others.isEmpty ? Array(repeating: false, count: days.count) : others
     }
 }
 
@@ -141,6 +144,7 @@ public extension ProgressStats {
         in sessions: [SessionRecord],
         weeks: Int,
         today: Date,
+        otherWorkoutDays: Set<Date> = [],
         calendar: Calendar = .current
     ) -> [HeatmapWeek] {
         guard weeks > 0, let thisWeek = calendar.dateInterval(of: .weekOfYear, for: today) else { return [] }
@@ -149,13 +153,14 @@ public extension ProgressStats {
         let todayStart = calendar.startOfDay(for: today)
         return (0..<weeks).reversed().compactMap { back -> HeatmapWeek? in
             guard let start = calendar.date(byAdding: .weekOfYear, value: -back, to: thisWeek.start) else { return nil }
-            let days = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }.map { day -> DayState in
+            let dates = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+            let days = dates.map { day -> DayState in
                 if day > todayStart { return .future }
                 if done.contains(day) { return .done }
                 if tried.contains(day) { return .partial }
                 return .rest
             }
-            return HeatmapWeek(weekStart: start, days: days)
+            return HeatmapWeek(weekStart: start, days: days, others: dates.map { otherWorkoutDays.contains($0) })
         }
     }
 
