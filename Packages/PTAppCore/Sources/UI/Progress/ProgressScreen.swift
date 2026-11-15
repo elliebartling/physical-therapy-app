@@ -16,6 +16,7 @@ public struct ProgressScreen: View {
         case exercise(UUID)
         case session(UUID)
         case allSessions
+        case activity(UInt)
     }
 
     public var body: some View {
@@ -46,12 +47,20 @@ public struct ProgressScreen: View {
                     SessionDetailView(viewModel: viewModel, sessionID: id)
                 case .allSessions:
                     AllSessionsView(viewModel: viewModel)
+                case .activity(let id):
+                    if let source = viewModel.otherWorkoutsSource,
+                       let activity = viewModel.activities.first(where: { $0.id == id })?.activity {
+                        CoverageRuleEditor(model: CoverageRuleEditorModel(
+                            activity: activity, exercises: viewModel.coverableExercises, source: source
+                        ))
+                    }
                 }
             }
             .sheet(isPresented: $preparingVisit) {
                 VisitSummaryView(summary: viewModel.visitSummary(), rangeTitle: viewModel.range.spokenTitle)
             }
             .onAppear { viewModel.refresh() }
+            .task { await viewModel.loadOtherWorkouts() }
             .alert("Something went wrong",
                    isPresented: Binding(get: { viewModel.errorMessage != nil },
                                         set: { if !$0 { viewModel.dismissError() } }),
@@ -70,6 +79,9 @@ public struct ProgressScreen: View {
             feel.padding(.top, 32)
             worthTelling.padding(.top, 32)
             exercises.padding(.top, 32)
+            if !viewModel.activities.isEmpty {
+                otherWorkouts.padding(.top, 32)
+            }
             allSessions.padding(.top, 32)
         }
     }
@@ -99,6 +111,16 @@ public struct ProgressScreen: View {
             HStack(spacing: 14) {
                 legendSwatch("Done", opacity: 1)
                 legendSwatch("Partial", opacity: 0.35)
+                if !viewModel.otherWorkouts.isEmpty {
+                    HStack(spacing: 6) {
+                        Circle().fill(AppColor.ink).frame(width: 6, height: 6)
+                        Text("OTHER WORKOUT")
+                            .font(AppFont.mono(10))
+                            .tracking(0.5)
+                            .foregroundStyle(AppColor.inkSecondary)
+                    }
+                    .accessibilityHidden(true)
+                }
                 Spacer()
                 if viewModel.longestStreak > 1 {
                     Text("LONGEST STREAK \(viewModel.longestStreak) DAYS")
@@ -129,7 +151,18 @@ public struct ProgressScreen: View {
             if viewModel.painPoints.isEmpty {
                 hint("Record pain at the end of a session and it shows up here.")
             } else {
-                PainChart(points: viewModel.painPoints)
+                PainChart(points: viewModel.painPoints, workouts: viewModel.otherWorkouts)
+                if !viewModel.otherWorkouts.isEmpty {
+                    HStack(spacing: 6) {
+                        Rectangle().fill(AccentFill(opacity: 1)).frame(width: 10, height: 6)
+                        Text("OTHER WORKOUTS")
+                            .font(AppFont.mono(10))
+                            .tracking(0.5)
+                            .foregroundStyle(AppColor.inkSecondary)
+                    }
+                    .padding(.top, 8)
+                    .accessibilityHidden(true)
+                }
             }
         }
     }
@@ -193,12 +226,24 @@ public struct ProgressScreen: View {
         }
     }
 
+    private var otherWorkouts: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ProgressSectionHeader(title: "06 — Other workouts", trailing: "From Apple Health")
+            ForEach(viewModel.activities) { row in
+                NavigationLink(value: Route.activity(row.id)) {
+                    ActivityProgressRow(row: row)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private var allSessions: some View {
         VStack(alignment: .leading, spacing: 0) {
             InkRule()
             NavigationLink(value: Route.allSessions) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("06 — All sessions")
+                    Text("\(viewModel.activities.isEmpty ? "06" : "07") — All sessions")
                         .font(AppFont.display(17, weight: .medium))
                     Spacer()
                     Text("\(viewModel.sessionCount)")
@@ -374,5 +419,58 @@ private struct ExerciseProgressRow: View {
         let done = row.stats.completed == 1 ? "DONE 1×" : "DONE \(row.stats.completed)×"
         guard row.stats.lastDone != nil else { return "\(row.prescription) — NOT DONE YET" }
         return "\(row.prescription) — \(done)"
+    }
+}
+
+/// One kind of workout from outside Mend: how often, and what it covers or how pain follows it.
+private struct ActivityProgressRow: View {
+    let row: ProgressViewModel.ActivityRow
+    @Environment(\.appAccent) private var accent
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.activity.name)
+                    .font(AppFont.display(17, weight: .medium))
+                Text(detail)
+                    .font(AppFont.mono(11))
+                    .tracking(0.4)
+                    .foregroundStyle(AppColor.inkSecondary)
+            }
+            Spacer(minLength: 8)
+            if let pain = row.nextDayPain {
+                Text((pain.isHigher ? "↑ Pain after" : "↓ Pain after").uppercased())
+                    .font(AppFont.mono(10, weight: .medium))
+                    .tracking(0.5)
+                    .foregroundStyle(pain.isHigher ? AppColor.onAccent : AppColor.inkSecondary)
+                    .padding(.horizontal, pain.isHigher ? 6 : 0)
+                    .padding(.vertical, 2)
+                    .background(pain.isHigher ? accent : .clear)
+            } else if row.covers > 0 {
+                Text("COVERS \(row.covers)")
+                    .font(AppFont.mono(10, weight: .medium))
+                    .tracking(0.5)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .overlay { Rectangle().strokeBorder(AppColor.hairline, lineWidth: 1) }
+            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AppColor.inkSecondary)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
+        .overlay(alignment: .top) { HairlineDivider() }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Choose which exercises it covers")
+    }
+
+    private var detail: String {
+        var parts = ["\(row.summary.count)×", ProgressViewModel.duration(minutes: row.summary.minutes).uppercased()]
+        if let meters = row.summary.distanceMeters, meters > 0 {
+            parts.append(ProgressViewModel.distance(meters: meters).uppercased())
+        }
+        return parts.joined(separator: " — ")
     }
 }

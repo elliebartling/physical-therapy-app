@@ -161,6 +161,7 @@ private struct EntryRow: View {
 
     private var status: String {
         guard entry.isDone else { return "Skipped" }
+        if let coveredBy = entry.coveredBy { return coveredBy }
         return entry.rating?.title ?? "Done"
     }
 }
@@ -341,8 +342,8 @@ struct SessionDetailView: View {
                         .foregroundStyle(item.isDone ? AppColor.ink : AppColor.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
-                    if let rating = item.rating {
-                        Text(rating.title.uppercased())
+                    if let label = item.coveredBy ?? item.rating?.title {
+                        Text(label.uppercased())
                             .font(AppFont.mono(11, weight: .medium))
                             .tracking(0.5)
                             .foregroundStyle(AppColor.inkSecondary)
@@ -351,7 +352,8 @@ struct SessionDetailView: View {
                 .padding(.vertical, 11)
                 .overlay(alignment: .top) { HairlineDivider() }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel([item.name, item.isDone ? "done" : "skipped", item.rating?.title]
+                .accessibilityLabel([item.name, item.isDone ? "done" : "skipped",
+                                     item.coveredBy.map { "covered by \($0.lowercased())" }, item.rating?.title]
                     .compactMap { $0 }.joined(separator: ", "))
             }
         }

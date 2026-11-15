@@ -59,6 +59,7 @@ public struct SettingsView: View {
                 }
 
                 HealthSettingsSection(viewModel: viewModel)
+                OtherWorkoutsSettingsSection(viewModel: viewModel)
 
                 Section("Sync") {
                     Label("Local only (v1)", systemImage: "iphone")
@@ -210,6 +211,30 @@ private struct HealthSettingsSection: View {
         if viewModel.healthEnabled {
             return "Each session you do or log is saved as a workout. Sessions you log later are marked as entered by you."
         }
-        return "Off. Mend only saves workouts; it never reads your Health data."
+        return "Off. Nothing is saved to Health."
+    }
+}
+
+/// Optional reading of other workouts from Apple Health, and what they count for.
+private struct OtherWorkoutsSettingsSection: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Section {
+            Toggle("Show other workouts", isOn: Binding(
+                get: { viewModel.readsWorkouts },
+                set: { enabled in Task { await viewModel.setReadsWorkouts(enabled) } }
+            ))
+            if viewModel.readsWorkouts {
+                NavigationLink("Counts toward your routine") {
+                    CoverageRulesView(source: viewModel.otherWorkouts, exercises: viewModel.coverableExercises)
+                }
+            }
+        } header: {
+            Text("Other workouts")
+        } footer: {
+            Text(viewModel.readMessage
+                 ?? "Runs, rides, yoga and anything else in Apple Health, from your Watch, Strava, Peloton and other apps, shown beside your sessions and pain. Mend only reads them, and they stay on this iPhone.")
+        }
     }
 }

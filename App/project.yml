@@ -45,7 +45,7 @@ targets:
         NSMicrophoneUsageDescription: "Lets you describe your exercises out loud instead of typing them."
         NSSpeechRecognitionUsageDescription: "Turns what you say into text on this iPhone so Mend can build your routine."
         NSHealthUpdateUsageDescription: "If you turn it on in Settings, Mend saves each PT session to Apple Health as a workout."
-        NSHealthShareUsageDescription: "Mend doesn't read your Health data. It only saves your PT sessions as workouts, if you turn that on."
+        NSHealthShareUsageDescription: "If you turn on Show other workouts in Settings, Mend reads your workouts from Health, such as runs, rides and yoga, to show them beside your PT sessions and pain. It never changes them, and they stay on this iPhone."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIAppFonts:

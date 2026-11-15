@@ -10,6 +10,8 @@ public struct HomeView: View {
     public var onSetup: () -> Void
     public var onEditRoutine: () -> Void
     @State private var logDay: LogDay? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     public init(viewModel: HomeViewModel, onStart: @escaping () -> Void,
                 onSettings: @escaping () -> Void, onSetup: @escaping () -> Void,
@@ -32,11 +34,21 @@ public struct HomeView: View {
         .background(AppColor.surface.ignoresSafeArea())
         .foregroundStyle(AppColor.ink)
         .task { await viewModel.refresh() }
+        // A workout may have landed in Health while Mend was in the background.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await viewModel.refresh() } }
+        }
         .sheet(item: $logDay, onDismiss: { Task { await viewModel.refresh() } }) { day in
             if let log = viewModel.logSession(on: day.date) {
                 LogSessionView(viewModel: log) { logDay = nil }
             }
         }
+        .alert("Something went wrong",
+               isPresented: Binding(get: { viewModel.errorMessage != nil },
+                                    set: { if !$0 { viewModel.dismissError() } }),
+               presenting: viewModel.errorMessage) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { Text($0) }
     }
 
     private var todayContent: some View {
@@ -47,10 +59,21 @@ public struct HomeView: View {
                 WeekStripView(week: viewModel.week) { logDay = LogDay(date: $0) }
                     .padding(.top, 20)
                 logSessionButton.padding(.top, 4)
+                ForEach(viewModel.offers) { offer in
+                    CoverageOfferCard(
+                        offer: offer,
+                        onCount: { Task { await viewModel.count(offer) } },
+                        onDismiss: { viewModel.dismiss(offer) }
+                    )
+                    .padding(.top, 16)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 routineSection.padding(.top, 28)
             }
             .padding(.horizontal, AppSpacing.screenPadding)
             .padding(.bottom, AppSpacing.s(3))
+            .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: viewModel.offers)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: viewModel.rows)
         }
         .scrollIndicators(.hidden)
         // Start is the round button at the end of the tab bar (MainTabsView).
@@ -93,7 +116,7 @@ public struct HomeView: View {
             HStack {
                 SectionLabel("01 — Today")
                 Spacer()
-                SectionLabel("\(viewModel.rows.count) ex / \(viewModel.estimatedMinutes) min")
+                SectionLabel(routineSummary)
             }
             .padding(.top, 10)
             HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -112,6 +135,14 @@ public struct HomeView: View {
             }
             .padding(.top, 12)
         }
+    }
+
+    private var routineSummary: String {
+        let remaining = viewModel.remainingCount
+        if remaining < viewModel.rows.count {
+            return "\(remaining) left / \(viewModel.estimatedMinutes) min"
+        }
+        return "\(viewModel.rows.count) ex / \(viewModel.estimatedMinutes) min"
     }
 
     /// Change the routine: tweak it in place, or bring in a new sheet after a PT visit.
@@ -229,12 +260,17 @@ struct WeekStripView: View {
         .accessibilityLabel("This week: \(week.completedCount) of 7 days with a session")
     }
 
+    private var showsWorkoutTags: Bool { week.days.contains { $0.otherWorkout != nil } }
+
     private func column(for day: WeekStrip.Day) -> some View {
         VStack(spacing: 6) {
             cell(for: day).frame(height: 34)
             Text(day.date.formatted(.dateTime.weekday(.narrow)))
                 .font(AppFont.mono(10, weight: day.isToday ? .medium : .regular))
                 .foregroundStyle(day.isToday ? AppColor.ink : AppColor.inkSecondary)
+            if showsWorkoutTags {
+                workoutTag(day.otherWorkout)
+            }
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
@@ -246,9 +282,28 @@ struct WeekStripView: View {
         return index > todayIndex
     }
 
+    /// The day's other workout, e.g. RUN, or an empty slot to keep the columns even.
+    private func workoutTag(_ tag: String?) -> some View {
+        Text(tag ?? " ")
+            .font(AppFont.mono(8, weight: .medium))
+            .tracking(0.3)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, 3)
+            .padding(.vertical, 1)
+            .overlay {
+                if tag != nil {
+                    Rectangle().strokeBorder(AppColor.inkSecondary, lineWidth: 1)
+                }
+            }
+            .opacity(tag == nil ? 0 : 1)
+    }
+
     private func accessibilityLabel(for day: WeekStrip.Day) -> String {
         let name = day.date.formatted(.dateTime.weekday(.wide).month().day())
-        return "\(name), \(day.isCompleted ? "session done" : "no session")"
+        var label = "\(name), \(day.isCompleted ? "session done" : "no session")"
+        if let other = day.otherWorkout { label += ", \(other.lowercased())" }
+        return label
     }
 
     @ViewBuilder
@@ -274,13 +329,80 @@ private struct ExerciseRowView: View {
                 .frame(width: 30, alignment: .leading)
             Text(row.name)
                 .font(AppFont.display(16, weight: .medium))
+                .strikethrough(row.coveredBy != nil)
+                .foregroundStyle(row.coveredBy == nil ? AppColor.ink : AppColor.inkSecondary)
             Spacer(minLength: 12)
-            Text(row.prescription)
-                .font(AppFont.mono(13))
+            if let coveredBy = row.coveredBy {
+                Text(coveredBy.uppercased())
+                    .font(AppFont.mono(10, weight: .medium))
+                    .tracking(0.5)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .overlay { Rectangle().strokeBorder(AppColor.hairline, lineWidth: 1) }
+            } else {
+                Text(row.prescription)
+                    .font(AppFont.mono(13))
+            }
         }
         .padding(.vertical, 11)
         .overlay(alignment: .top) { HairlineDivider() }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(row.coveredBy.map { "\(row.name), covered by \($0.lowercased())" }
+                            ?? "\(row.name), \(row.prescription)")
+    }
+}
+
+/// A workout from Apple Health that covers some of today's exercises, asking before it counts.
+private struct CoverageOfferCard: View {
+    let offer: HomeViewModel.CoverageOffer
+    let onCount: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                SectionLabel("From Apple Health")
+                Spacer()
+                Text(offer.end.formatted(date: .omitted, time: .shortened).uppercased())
+                    .font(AppFont.mono(11))
+                    .foregroundStyle(AppColor.inkSecondary)
+            }
+            Text(headline)
+                .font(AppFont.display(20, weight: .semibold))
+                .tracking(-0.4)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(offer.exercises.map(\.name).formatted(.list(type: .and)) + ".")
+                .font(AppFont.body(14))
+                .foregroundStyle(AppColor.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Button(action: onCount) {
+                    Text(offer.exercises.count == 1 ? "Count it" : "Count them")
+                        .font(AppFont.display(16, weight: .semibold))
+                }
+                .buttonStyle(InkGlassButtonStyle())
+                Button(action: onDismiss) {
+                    Text("Not today")
+                        .font(AppFont.display(16, weight: .medium))
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 60)
+                        .contentShape(Capsule())
+                        .overlay { Capsule().strokeBorder(AppColor.hairline, lineWidth: 1) }
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 4)
+        }
+        .padding(16)
+        .background(AppColor.ink.opacity(0.05), in: RoundedRectangle(cornerRadius: 24))
+        .overlay { RoundedRectangle(cornerRadius: 24).strokeBorder(AppColor.hairline, lineWidth: 1) }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var headline: String {
+        let count = offer.exercises.count
+        let covers = count == 1 ? "1 of your exercises" : "\(count) of your exercises"
+        return "\(offer.workoutName), \(offer.minutes) min. That covers \(covers)."
     }
 }
 

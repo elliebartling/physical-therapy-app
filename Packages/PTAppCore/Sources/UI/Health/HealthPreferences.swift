@@ -30,28 +30,35 @@ public enum HealthWorkoutKind: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// The person's Apple Health choices. Off until they turn it on in Settings.
+/// The person's Apple Health choices. Each is off until they turn it on in Settings.
 public struct HealthPreferences: Equatable, Sendable {
     public static let enabledKey = "healthSyncEnabled"
     public static let kindKey = "healthWorkoutKind"
+    public static let readsWorkoutsKey = "healthReadsWorkouts"
 
+    /// Saving sessions to Health.
     public var isEnabled: Bool
     public var kind: HealthWorkoutKind
+    /// Reading other workouts from Health.
+    public var readsWorkouts: Bool
 
-    public init(isEnabled: Bool = false, kind: HealthWorkoutKind = .recovery) {
+    public init(isEnabled: Bool = false, kind: HealthWorkoutKind = .recovery, readsWorkouts: Bool = false) {
         self.isEnabled = isEnabled
         self.kind = kind
+        self.readsWorkouts = readsWorkouts
     }
 
     public static func load(from defaults: UserDefaults = .standard) -> HealthPreferences {
         HealthPreferences(
             isEnabled: defaults.bool(forKey: enabledKey),
-            kind: defaults.string(forKey: kindKey).flatMap(HealthWorkoutKind.init(rawValue:)) ?? .recovery
+            kind: defaults.string(forKey: kindKey).flatMap(HealthWorkoutKind.init(rawValue:)) ?? .recovery,
+            readsWorkouts: defaults.bool(forKey: readsWorkoutsKey)
         )
     }
 
     public func save(to defaults: UserDefaults = .standard) {
         defaults.set(isEnabled, forKey: Self.enabledKey)
         defaults.set(kind.rawValue, forKey: Self.kindKey)
+        defaults.set(readsWorkouts, forKey: Self.readsWorkoutsKey)
     }
 }

@@ -12,6 +12,9 @@ public final class ExerciseRecord {
     public var completedAt: Date?
     /// How it felt, if the person rated it. Optional so older records migrate as-is.
     public var ratingRaw: String? = nil
+    /// The other workout that stood in for this exercise (e.g. "Yoga"), when it wasn't
+    /// done in Mend. Optional so older records migrate as-is.
+    public var coveredBy: String? = nil
 
     public init(
         id: UUID = UUID(),
