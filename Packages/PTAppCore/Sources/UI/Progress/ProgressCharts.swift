@@ -181,7 +181,7 @@ struct ConsistencyHeatmap: View {
         let partial = days.filter { $0 == .partial }.count
         let counted = days.filter { $0 == .otherWorkout }.count
         var text = "Last \(weeks.count) weeks: \(done) \(done == 1 ? "day" : "days") done"
-        if counted > 0 { text += ", \(counted) with another workout that counts"
+        if counted > 0 { text += ", \(counted) with another workout that counts" }
         if partial > 0 { text += ", \(partial) partly done" }
         let others = weeks.flatMap(\.others).filter { $0 }.count
         if others > 0 { text += ", \(others) \(others == 1 ? "day" : "days") with another workout" }
