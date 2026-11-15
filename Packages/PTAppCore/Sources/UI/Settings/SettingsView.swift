@@ -1,4 +1,5 @@
 import SwiftUI
+import HistoryKit
 
 public struct SettingsView: View {
     @Bindable public var viewModel: SettingsViewModel
@@ -219,6 +220,14 @@ private struct HealthSettingsSection: View {
 private struct OtherWorkoutsSettingsSection: View {
     @Bindable var viewModel: SettingsViewModel
 
+    private var footer: String {
+        var text = "Runs, rides, yoga and anything else in Apple Health, from your Watch, Strava, Peloton and other apps, shown beside your sessions and pain. Mend only reads them, and they stay on this iPhone."
+        if viewModel.readsWorkouts && viewModel.workoutsCountTowardGoal {
+            text += " A day with a workout of \(OtherWorkoutStats.countingMinutes) minutes or more counts toward your weekly goal and streak."
+        }
+        return text
+    }
+
     var body: some View {
         Section {
             Toggle("Show other workouts", isOn: Binding(
@@ -226,6 +235,7 @@ private struct OtherWorkoutsSettingsSection: View {
                 set: { enabled in Task { await viewModel.setReadsWorkouts(enabled) } }
             ))
             if viewModel.readsWorkouts {
+                Toggle("Count toward goal and streak", isOn: $viewModel.workoutsCountTowardGoal)
                 NavigationLink("Counts toward your routine") {
                     CoverageRulesView(source: viewModel.otherWorkouts, exercises: viewModel.coverableExercises)
                 }
@@ -233,8 +243,7 @@ private struct OtherWorkoutsSettingsSection: View {
         } header: {
             Text("Other workouts")
         } footer: {
-            Text(viewModel.readMessage
-                 ?? "Runs, rides, yoga and anything else in Apple Health, from your Watch, Strava, Peloton and other apps, shown beside your sessions and pain. Mend only reads them, and they stay on this iPhone.")
+            Text(viewModel.readMessage ?? footer)
         }
     }
 }

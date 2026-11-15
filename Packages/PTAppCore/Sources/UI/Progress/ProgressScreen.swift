@@ -110,8 +110,11 @@ public struct ProgressScreen: View {
             ConsistencyHeatmap(weeks: viewModel.heatmap)
             HStack(spacing: 14) {
                 legendSwatch("Done", opacity: 1)
+                if viewModel.countsOtherWorkouts && !viewModel.otherWorkouts.isEmpty {
+                    legendSwatch("Workout", opacity: 0.65)
+                }
                 legendSwatch("Partial", opacity: 0.35)
-                if !viewModel.otherWorkouts.isEmpty {
+                if !viewModel.otherWorkouts.isEmpty && !viewModel.countsOtherWorkouts {
                     HStack(spacing: 6) {
                         Circle().fill(AppColor.ink).frame(width: 6, height: 6)
                         Text("OTHER WORKOUT")

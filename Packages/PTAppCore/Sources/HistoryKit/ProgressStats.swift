@@ -36,15 +36,18 @@ public struct ExerciseStats: Equatable, Sendable {
 public enum ProgressStats {
     /// The last `weeks` calendar weeks, oldest first, ending with the week
     /// containing `today`. Counts distinct days with a completed session, the
-    /// same rule as the week strip and the streak.
+    /// same rule as the week strip and the streak; `extraDays` (start-of-day
+    /// dates, e.g. days with another workout) count too.
     public static func weeklyDays(
         in sessions: [SessionRecord],
         weeks: Int,
         today: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        extraDays: Set<Date> = []
     ) -> [WeekCount] {
         guard weeks > 0, let thisWeek = calendar.dateInterval(of: .weekOfYear, for: today) else { return [] }
         let completedDays = Set(sessions.compactMap(\.completedAt).map { calendar.startOfDay(for: $0) })
+            .union(extraDays)
         return (0..<weeks).reversed().compactMap { back -> WeekCount? in
             guard let start = calendar.date(byAdding: .weekOfYear, value: -back, to: thisWeek.start),
                   let end = calendar.date(byAdding: .day, value: 7, to: start) else { return nil }

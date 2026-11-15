@@ -295,4 +295,67 @@ final class OtherWorkoutsUITests: XCTestCase {
         XCTAssertNil(source.rule(for: yoga.id))
         XCTAssertFalse(editor.isSaved)
     }
+
+    // MARK: Counting toward the goal and streak
+
+    func test_otherWorkoutDays_countTowardTheStreakAndTheWeek() async throws {
+        addWorkout(running, at: day(9, hour: 7), minutes: 30)
+        addWorkout(running, at: day(10, hour: 7), minutes: 30)
+        addWorkout(yoga, at: day(8, hour: 7), minutes: 5)      // too short to count
+
+        let vm = await home(source())
+
+        XCTAssertEqual(vm.streak, 2, "Monday and Tuesday")
+        XCTAssertEqual(vm.headline, "2 active days this week.")
+        XCTAssertFalse(vm.isDoneToday, "today still needs PT")
+        let tuesday = try XCTUnwrap(vm.week.days.first { calendar.isDate($0.date, inSameDayAs: day(10)) })
+        XCTAssertTrue(tuesday.countsOtherWorkout)
+    }
+
+    func test_otherWorkoutDays_canBeLeftOutOfTheStreak() async throws {
+        addWorkout(running, at: day(10, hour: 7), minutes: 30)
+        let source = source()
+        HealthPreferences(readsWorkouts: true, countsTowardGoal: false).save(to: defaults)
+
+        let vm = await home(source)
+
+        XCTAssertEqual(vm.streak, 0)
+        XCTAssertEqual(vm.headline, "Ready when you are.")
+        XCTAssertEqual(vm.week.days.first { calendar.isDate($0.date, inSameDayAs: day(10)) }?.otherWorkout, "RUN")
+    }
+
+    func test_aPartlyDoneDay_showsAsPartial() async throws {
+        try sessionRepo.insert(SessionRecord(routineID: routine.id, startedAt: day(10), exerciseRecords: [
+            ExerciseRecord(exerciseID: bridges.id, status: .completed, startedAt: day(10)),
+        ]))
+
+        let vm = await home(source())
+
+        let tuesday = try XCTUnwrap(vm.week.days.first { calendar.isDate($0.date, inSameDayAs: day(10)) })
+        XCTAssertTrue(tuesday.isPartial)
+        XCTAssertFalse(tuesday.isActive)
+    }
+
+    func test_progress_countsOtherWorkoutDaysTowardTheGoal_andSaysSoForYourPT() async throws {
+        try sessionRepo.insert(SessionRecord(routineID: routine.id, startedAt: day(9), completedAt: day(9)))
+        addWorkout(running, at: day(10, hour: 7), minutes: 30)
+
+        let vm = await progress(source())
+
+        XCTAssertEqual(vm.daysThisWeek, 2)
+        XCTAssertEqual(vm.sessionDays, 1)
+        XCTAssertTrue(vm.heatmap.flatMap(\.days).contains(.otherWorkout))
+        let summary = vm.visitSummary()
+        XCTAssertTrue(summary.contains("• 1 day with a full session"))
+        XCTAssertTrue(summary.contains("• 1 more day with another workout, counted toward the goal"))
+    }
+
+    func test_settings_countingTowardTheGoal_isOnUntilTurnedOff() {
+        let settings = SettingsViewModel(workoutReader: reader, defaults: defaults)
+        XCTAssertTrue(settings.workoutsCountTowardGoal)
+
+        settings.workoutsCountTowardGoal = false
+
+        XCTAssertFalse(HealthPreferences.load(from: defaults).countsTowardGoal)
+    }
 }
