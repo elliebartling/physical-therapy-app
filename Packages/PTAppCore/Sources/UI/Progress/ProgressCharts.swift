@@ -147,10 +147,10 @@ struct ConsistencyHeatmap: View {
                 }
             }
             .overlay {
-                // A workout from outside Mend: a dot, dark on a done day so it shows on the accent.
+                // A workout from outside Mend: a dot, dark on an accent-filled day so it shows.
                 if hasOther {
                     Circle()
-                        .fill(state == .done ? AppColor.onAccent : AppColor.ink)
+                        .fill(state == .done || state == .otherWorkout ? AppColor.onAccent : AppColor.ink)
                         .padding(5)
                 }
             }
@@ -162,6 +162,7 @@ struct ConsistencyHeatmap: View {
         switch state {
         case .done: accent
         case .partial: accent.opacity(0.35)
+        case .otherWorkout: accent.opacity(0.65)
         case .rest: AppColor.hairline
         case .future: .clear
         }
@@ -178,7 +179,9 @@ struct ConsistencyHeatmap: View {
         let days = weeks.flatMap(\.days)
         let done = days.filter { $0 == .done }.count
         let partial = days.filter { $0 == .partial }.count
+        let counted = days.filter { $0 == .otherWorkout }.count
         var text = "Last \(weeks.count) weeks: \(done) \(done == 1 ? "day" : "days") done"
+        if counted > 0 { text += ", \(counted) with another workout that counts" }
         if partial > 0 { text += ", \(partial) partly done" }
         let others = weeks.flatMap(\.others).filter { $0 }.count
         if others > 0 { text += ", \(others) \(others == 1 ? "day" : "days") with another workout" }

@@ -113,4 +113,45 @@ final class OtherWorkoutsTests: XCTestCase {
         XCTAssertEqual(week.days.map(\.otherWorkout), ["YOGA", nil, nil, nil, nil, nil, nil],
                        "the longest workout that day gives the tag")
     }
+
+    // MARK: Counting toward the goal and streak
+
+    func test_countingDays_needTenMinutes() {
+        let workouts = [workout(running, on: day(9), minutes: 25), workout(yoga, on: day(10), minutes: 8)]
+        XCTAssertEqual(OtherWorkoutStats.countingDays(of: workouts, calendar: calendar), [day(9, hour: 0)])
+    }
+
+    func test_countedDays_joinTheStreakTheWeekAndTheHeatmap() {
+        let today = day(11, hour: 15)  // Wednesday
+        let session = SessionRecord(routineID: UUID(), startedAt: day(11), completedAt: day(11))
+        let extra: Set<Date> = [day(9, hour: 0), day(10, hour: 0), day(11, hour: 0)]
+
+        XCTAssertEqual(StreakCalculator.currentStreak(in: [session], today: today, calendar: calendar), 1)
+        XCTAssertEqual(StreakCalculator.currentStreak(in: [session], today: today, calendar: calendar, extraDays: extra), 3)
+        XCTAssertEqual(ProgressStats.weeklyDays(in: [session], weeks: 1, today: today, calendar: calendar,
+                                                extraDays: extra).map(\.days), [3], "a day with both counts once")
+        XCTAssertEqual(ProgressStats.longestStreak(in: [], from: day(1), through: today, calendar: calendar,
+                                                   extraDays: extra), 3)
+
+        let heatmap = ProgressStats.heatmap(in: [session], weeks: 1, today: today, countedDays: extra, calendar: calendar)
+        XCTAssertEqual(heatmap[0].days, [.otherWorkout, .otherWorkout, .done, .future, .future, .future, .future])
+    }
+
+    func test_weekStrip_marksPartialDays_andCountedWorkouts() {
+        let today = day(11, hour: 15)
+        let sessions = [SessionRecord(routineID: UUID(), startedAt: day(9))]   // started, not finished
+        let workouts = [workout(running, on: day(10, hour: 7), minutes: 30)]
+
+        let counting = WeekStrip.forWeek(containing: today, sessions: sessions, otherWorkouts: workouts,
+                                         countingOtherWorkouts: true, calendar: calendar)
+        XCTAssertEqual(counting.days.map(\.isPartial), [true, false, false, false, false, false, false])
+        XCTAssertEqual(counting.days.map(\.countsOtherWorkout), [false, true, false, false, false, false, false])
+        XCTAssertEqual(counting.activeCount, 1)
+        XCTAssertEqual(counting.completedCount, 0)
+
+        let notCounting = WeekStrip.forWeek(containing: today, sessions: sessions, otherWorkouts: workouts,
+                                            calendar: calendar)
+        XCTAssertEqual(notCounting.activeCount, 0)
+        XCTAssertEqual(notCounting.days[1].otherWorkout, "RUN", "still tagged")
+    }
 }

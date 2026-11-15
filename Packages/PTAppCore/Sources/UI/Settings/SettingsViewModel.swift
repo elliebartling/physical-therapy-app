@@ -22,6 +22,10 @@ public final class SettingsViewModel {
     public private(set) var readsWorkouts: Bool
     /// Shown under the other-workouts switch when turning it on didn't work.
     public private(set) var readMessage: String?
+    /// Days with another workout count toward the weekly goal and streak.
+    public var workoutsCountTowardGoal: Bool {
+        didSet { healthPreferences.save(to: defaults) }
+    }
     /// Other workouts and what each kind covers.
     public let otherWorkouts: OtherWorkoutsSource
     /// The current routine's exercises, for saying what a workout covers.
@@ -54,10 +58,12 @@ public final class SettingsViewModel {
         self.healthEnabled = saved.isEnabled
         self.healthKind = saved.kind
         self.readsWorkouts = saved.readsWorkouts
+        self.workoutsCountTowardGoal = saved.countsTowardGoal
     }
 
     private var healthPreferences: HealthPreferences {
-        HealthPreferences(isEnabled: healthEnabled, kind: healthKind, readsWorkouts: readsWorkouts)
+        HealthPreferences(isEnabled: healthEnabled, kind: healthKind, readsWorkouts: readsWorkouts,
+                          countsTowardGoal: workoutsCountTowardGoal)
     }
 
     /// Turning on asks Health for permission to read workouts. Health never says whether

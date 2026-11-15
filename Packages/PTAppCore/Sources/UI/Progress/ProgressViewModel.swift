@@ -137,7 +137,10 @@ public final class ProgressViewModel {
 
     // Across the range
     public private(set) var weeks: [WeekCount] = []
+    /// Days with a completed session, or another workout when those count.
     public private(set) var activeDays = 0
+    /// Days with a completed PT session, whatever else counts.
+    public private(set) var sessionDays = 0
     public private(set) var minutes = 0
     public private(set) var heatmap: [HeatmapWeek] = []
     public private(set) var longestStreak = 0
@@ -162,6 +165,8 @@ public final class ProgressViewModel {
     public private(set) var errorMessage: String?
 
     public var hasSessions: Bool { !months.isEmpty }
+    /// Days with another workout count toward the goal and streak.
+    public var countsOtherWorkouts: Bool { otherWorkoutsSource?.countsTowardGoal ?? false }
     /// The weekly goal, kept within a week.
     private var goal: Int { min(max(weeklyGoal, 1), 7) }
     public var sessionCount: Int { sessions.count }
@@ -304,7 +309,6 @@ public final class ProgressViewModel {
             allExercises.map { ($0.id, Prescription.text(target: $0.target, side: $0.side)) },
             uniquingKeysWith: { first, _ in first }
         )
-        streak = StreakCalculator.currentStreak(in: sessions, today: today, calendar: calendar)
 
         let stats = ProgressStats.exerciseStats(in: sessions, groupedBy: { [lineage] in lineage[$0] ?? $0 })
         let active = routines.first(where: \.isActive)?.orderedExercises ?? []
@@ -341,7 +345,13 @@ public final class ProgressViewModel {
     /// Everything that depends on the range or the goal.
     private func buildRange() {
         let count = range.weekCount(firstSession: firstSessionDate, today: today, calendar: calendar)
-        weeks = ProgressStats.weeklyDays(in: sessions, weeks: count, today: today, calendar: calendar)
+        // Days with another workout count toward the goal and streak, when that's on.
+        let counted = countsOtherWorkouts ? OtherWorkoutStats.countingDays(of: allOtherWorkouts, calendar: calendar) : []
+        streak = StreakCalculator.currentStreak(in: sessions, today: today, calendar: calendar, extraDays: counted)
+        weeks = ProgressStats.weeklyDays(in: sessions, weeks: count, today: today, calendar: calendar,
+                                         extraDays: counted)
+        sessionDays = ProgressStats.weeklyDays(in: sessions, weeks: count, today: today, calendar: calendar)
+            .reduce(0) { $0 + $1.days }
         activeDays = weeks.reduce(0) { $0 + $1.days }
         daysThisWeek = weeks.last?.days ?? 0
         goalStatus = ProgressStats.goalStatus(daysThisWeek: daysThisWeek, goal: goal, today: today, calendar: calendar)
@@ -353,8 +363,9 @@ public final class ProgressViewModel {
         otherWorkouts = allOtherWorkouts.filter { $0.start >= start }
         heatmap = ProgressStats.heatmap(in: sessions, weeks: min(count, Self.maxHeatmapWeeks), today: today,
                                         otherWorkoutDays: OtherWorkoutStats.days(of: otherWorkouts, calendar: calendar),
-                                        calendar: calendar)
-        longestStreak = ProgressStats.longestStreak(in: sessions, from: start, through: today, calendar: calendar)
+                                        countedDays: counted, calendar: calendar)
+        longestStreak = ProgressStats.longestStreak(in: sessions, from: start, through: today, calendar: calendar,
+                                                    extraDays: counted)
         painPoints = ProgressStats.painPoints(in: inRange)
         painNow = painPoints.last?.level
         painFrom = painPoints.count > 1 && painPoints.first?.level != painNow ? painPoints.first?.level : nil
@@ -519,11 +530,15 @@ public final class ProgressViewModel {
         lines.append("")
         lines.append("CONSISTENCY")
         let weekWord = weeks.count == 1 ? "week" : "weeks"
-        var consistency = "• \(activeDays) \(activeDays == 1 ? "day" : "days") with a full session in \(weeks.count) \(weekWord)"
+        var consistency = "• \(sessionDays) \(sessionDays == 1 ? "day" : "days") with a full session in \(weeks.count) \(weekWord)"
         consistency += " (goal \(goal) a week"
         if let goalShare { consistency += ", \(goalShare.formatted(.percent.precision(.fractionLength(0)))) of goal" }
         consistency += ")"
         lines.append(consistency)
+        if activeDays > sessionDays {
+            let more = activeDays - sessionDays
+            lines.append("• \(more) more \(more == 1 ? "day" : "days") with another workout, counted toward the goal")
+        }
         if minutes > 0 { lines.append("• \(minutes) minutes of guided sessions") }
         if longestStreak > 1 { lines.append("• Longest streak \(longestStreak) days") }
 

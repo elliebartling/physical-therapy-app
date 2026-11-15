@@ -35,24 +35,30 @@ public struct HealthPreferences: Equatable, Sendable {
     public static let enabledKey = "healthSyncEnabled"
     public static let kindKey = "healthWorkoutKind"
     public static let readsWorkoutsKey = "healthReadsWorkouts"
+    public static let countsTowardGoalKey = "otherWorkoutsCountTowardGoal"
 
     /// Saving sessions to Health.
     public var isEnabled: Bool
     public var kind: HealthWorkoutKind
     /// Reading other workouts from Health.
     public var readsWorkouts: Bool
+    /// Days with another workout count toward the weekly goal and streak. On unless turned off.
+    public var countsTowardGoal: Bool
 
-    public init(isEnabled: Bool = false, kind: HealthWorkoutKind = .recovery, readsWorkouts: Bool = false) {
+    public init(isEnabled: Bool = false, kind: HealthWorkoutKind = .recovery, readsWorkouts: Bool = false,
+                countsTowardGoal: Bool = true) {
         self.isEnabled = isEnabled
         self.kind = kind
         self.readsWorkouts = readsWorkouts
+        self.countsTowardGoal = countsTowardGoal
     }
 
     public static func load(from defaults: UserDefaults = .standard) -> HealthPreferences {
         HealthPreferences(
             isEnabled: defaults.bool(forKey: enabledKey),
             kind: defaults.string(forKey: kindKey).flatMap(HealthWorkoutKind.init(rawValue:)) ?? .recovery,
-            readsWorkouts: defaults.bool(forKey: readsWorkoutsKey)
+            readsWorkouts: defaults.bool(forKey: readsWorkoutsKey),
+            countsTowardGoal: defaults.object(forKey: countsTowardGoalKey) as? Bool ?? true
         )
     }
 
@@ -60,5 +66,6 @@ public struct HealthPreferences: Equatable, Sendable {
         defaults.set(isEnabled, forKey: Self.enabledKey)
         defaults.set(kind.rawValue, forKey: Self.kindKey)
         defaults.set(readsWorkouts, forKey: Self.readsWorkoutsKey)
+        defaults.set(countsTowardGoal, forKey: Self.countsTowardGoalKey)
     }
 }

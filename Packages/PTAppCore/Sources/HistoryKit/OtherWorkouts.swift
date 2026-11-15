@@ -165,4 +165,12 @@ public enum OtherWorkoutStats {
     public static func days(of workouts: [OtherWorkout], calendar: Calendar = .current) -> Set<Date> {
         Set(workouts.map { calendar.startOfDay(for: $0.start) })
     }
+
+    /// The shortest workout that counts toward the weekly goal and streak.
+    public static let countingMinutes = 10
+
+    /// Start-of-day dates with a workout long enough to count toward the goal and streak.
+    public static func countingDays(of workouts: [OtherWorkout], calendar: Calendar = .current) -> Set<Date> {
+        days(of: workouts.filter { $0.minutes >= countingMinutes }, calendar: calendar)
+    }
 }

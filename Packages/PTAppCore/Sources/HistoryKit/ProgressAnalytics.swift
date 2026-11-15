@@ -45,6 +45,8 @@ public enum DayState: Equatable, Sendable {
     case done
     /// A session was started or logged but not every exercise was done.
     case partial
+    /// No completed session, but another workout that counts toward the goal.
+    case otherWorkout
     case rest
     /// Later this week.
     case future
@@ -145,6 +147,7 @@ public extension ProgressStats {
         weeks: Int,
         today: Date,
         otherWorkoutDays: Set<Date> = [],
+        countedDays: Set<Date> = [],
         calendar: Calendar = .current
     ) -> [HeatmapWeek] {
         guard weeks > 0, let thisWeek = calendar.dateInterval(of: .weekOfYear, for: today) else { return [] }
@@ -157,6 +160,7 @@ public extension ProgressStats {
             let days = dates.map { day -> DayState in
                 if day > todayStart { return .future }
                 if done.contains(day) { return .done }
+                if countedDays.contains(day) { return .otherWorkout }
                 if tried.contains(day) { return .partial }
                 return .rest
             }
@@ -164,14 +168,16 @@ public extension ProgressStats {
         }
     }
 
-    /// The longest run of consecutive days with a completed session, from `start` through `end`.
+    /// The longest run of consecutive days with a completed session (or one of `extraDays`),
+    /// from `start` through `end`.
     static func longestStreak(
         in sessions: [SessionRecord],
         from start: Date,
         through end: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        extraDays: Set<Date> = []
     ) -> Int {
-        let days = Set(sessions.compactMap(\.completedAt).map { calendar.startOfDay(for: $0) })
+        let days = Set(sessions.compactMap(\.completedAt).map { calendar.startOfDay(for: $0) }).union(extraDays)
             .filter { $0 >= calendar.startOfDay(for: start) && $0 <= end }
             .sorted()
         var longest = 0

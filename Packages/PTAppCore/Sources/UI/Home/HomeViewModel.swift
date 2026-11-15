@@ -70,6 +70,9 @@ public final class HomeViewModel {
     /// The big statement at the top of Today. Kind, never guilt-tripping.
     public var headline: String {
         if isDoneToday { return "Done for today." }
+        if week.activeCount > week.completedCount {
+            return week.activeCount == 1 ? "1 active day this week." : "\(week.activeCount) active days this week."
+        }
         switch week.completedCount {
         case 0: return "Ready when you are."
         case 1: return "1 session this week."
@@ -80,7 +83,8 @@ public final class HomeViewModel {
     /// A log for a session done away from the app, or nil when there's no routine.
     public func logSession(on date: Date) -> LogSessionViewModel? {
         guard let routine = try? routineRepo.fetchActive() else { return nil }
-        return LogSessionViewModel(routine: routine, sessionRepo: sessionRepo, date: date, now: today)
+        return LogSessionViewModel(routine: routine, sessionRepo: sessionRepo, date: date, now: today,
+                                   calendar: calendar, otherWorkouts: otherWorkouts)
     }
 
     public func refresh() async {
@@ -89,11 +93,17 @@ public final class HomeViewModel {
         routineName = routine?.name ?? ""
         let exercises = routine?.orderedExercises ?? []
 
-        var weekWorkouts: [OtherWorkout] = []
-        if let otherWorkouts, otherWorkouts.isOn,
-           let weekStart = calendar.dateInterval(of: .weekOfYear, for: today)?.start {
-            weekWorkouts = await otherWorkouts.workouts(from: weekStart, to: today)
+        // This week's workouts, or a year's when they count toward the streak.
+        var recentWorkouts: [OtherWorkout] = []
+        let counting = otherWorkouts?.countsTowardGoal ?? false
+        let weekStart = calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? calendar.startOfDay(for: today)
+        if let otherWorkouts, otherWorkouts.isOn {
+            let from = counting
+                ? calendar.date(byAdding: .day, value: -ActivityStreak.lookbackDays, to: today) ?? weekStart
+                : weekStart
+            recentWorkouts = await otherWorkouts.workouts(from: min(from, weekStart), to: today)
         }
+        let weekWorkouts = recentWorkouts.filter { $0.start >= weekStart }
         let todayStart = calendar.startOfDay(for: today)
         todaysWorkouts = weekWorkouts.filter { calendar.startOfDay(for: $0.start) == todayStart }
 
@@ -124,8 +134,12 @@ public final class HomeViewModel {
             )
         }
         estimatedMinutes = SessionEstimate.minutes(for: exercises.filter { covered[$0.id] == nil })
-        streak = StreakCalculator.currentStreak(in: sessions, today: today, calendar: calendar)
-        week = WeekStrip.forWeek(containing: today, sessions: sessions, otherWorkouts: weekWorkouts, calendar: calendar)
+        streak = StreakCalculator.currentStreak(
+            in: sessions, today: today, calendar: calendar,
+            extraDays: counting ? OtherWorkoutStats.countingDays(of: recentWorkouts, calendar: calendar) : []
+        )
+        week = WeekStrip.forWeek(containing: today, sessions: sessions, otherWorkouts: weekWorkouts,
+                                 countingOtherWorkouts: counting, calendar: calendar)
     }
 
     /// Counts the offered workout for the exercises it covers.

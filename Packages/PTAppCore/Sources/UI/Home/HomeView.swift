@@ -257,7 +257,9 @@ struct WeekStripView: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("This week: \(week.completedCount) of 7 days with a session")
+        .accessibilityLabel(week.activeCount > week.completedCount
+                            ? "This week: \(week.activeCount) of 7 days active"
+                            : "This week: \(week.completedCount) of 7 days with a session")
     }
 
     private var showsWorkoutTags: Bool { week.days.contains { $0.otherWorkout != nil } }
@@ -301,17 +303,28 @@ struct WeekStripView: View {
 
     private func accessibilityLabel(for day: WeekStrip.Day) -> String {
         let name = day.date.formatted(.dateTime.weekday(.wide).month().day())
-        var label = "\(name), \(day.isCompleted ? "session done" : "no session")"
+        let state = day.isCompleted ? "session done"
+            : day.countsOtherWorkout ? "another workout"
+            : day.isPartial ? "session partly done"
+            : "no session"
+        var label = "\(name), \(state)"
         if let other = day.otherWorkout { label += ", \(other.lowercased())" }
         return label
     }
 
+    /// Solid ink for a PT session, a lighter ink for another workout that counts,
+    /// the accent for today, and a faint fill for a session only partly done.
     @ViewBuilder
     private func cell(for day: WeekStrip.Day) -> some View {
         if day.isCompleted {
             Rectangle().fill(AppColor.ink)
+        } else if day.countsOtherWorkout {
+            Rectangle().fill(AppColor.ink.opacity(0.5))
         } else if day.isToday {
             Rectangle().fill(accent)
+        } else if day.isPartial {
+            Rectangle().fill(AppColor.ink.opacity(0.16))
+                .overlay { Rectangle().strokeBorder(AppColor.ink.opacity(0.3), lineWidth: 1) }
         } else {
             Rectangle().strokeBorder(AppColor.hairline, lineWidth: 1)
         }

@@ -1,4 +1,5 @@
 import Foundation
+import DataKit
 import HistoryKit
 import os
 
@@ -23,6 +24,9 @@ public final class OtherWorkoutsSource {
 
     /// Reading is turned on and Health is available on this device.
     public var isOn: Bool { HealthPreferences.load(from: defaults).readsWorkouts && reader.isAvailable }
+
+    /// Days with another workout count toward the weekly goal and streak.
+    public var countsTowardGoal: Bool { isOn && HealthPreferences.load(from: defaults).countsTowardGoal }
 
     /// Workouts that started in the range, newest first. Empty when reading is off; a
     /// failed read is logged and also comes back empty, since it only adds context.
@@ -82,5 +86,22 @@ public final class OtherWorkoutsSource {
 
     public func isDismissed(_ workoutID: UUID) -> Bool {
         (defaults.stringArray(forKey: Self.dismissedKey) ?? []).contains(workoutID.uuidString)
+    }
+}
+
+/// The current streak, with days of other workouts when they count toward it.
+@MainActor
+public enum ActivityStreak {
+    /// How far back other workouts are read for a streak.
+    static let lookbackDays = 365
+
+    public static func current(sessions: [SessionRecord], source: OtherWorkoutsSource?,
+                               today: Date = .now, calendar: Calendar = .current) async -> Int {
+        var extra: Set<Date> = []
+        if let source, source.countsTowardGoal,
+           let from = calendar.date(byAdding: .day, value: -lookbackDays, to: today) {
+            extra = OtherWorkoutStats.countingDays(of: await source.workouts(from: from, to: today), calendar: calendar)
+        }
+        return StreakCalculator.currentStreak(in: sessions, today: today, calendar: calendar, extraDays: extra)
     }
 }
