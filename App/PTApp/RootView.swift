@@ -58,6 +58,11 @@ struct RootView: View {
                             let sessions = (try? sessionRepo.fetchAll()) ?? []
                             lastStreak = StreakCalculator.currentStreak(in: sessions, today: .now)
                             route = .complete
+                            // Days with other workouts can lengthen it, once Health answers.
+                            Task {
+                                let all = (try? sessionRepo.fetchAll()) ?? []
+                                lastStreak = await ActivityStreak.current(sessions: all, source: OtherWorkoutsSource())
+                            }
                         },
                         onEnd: { route = .home }
                     )

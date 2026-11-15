@@ -3,17 +3,19 @@ import DataKit
 
 public enum StreakCalculator {
     /// Current consecutive-day streak counted from the most recent completed day
-    /// (today or yesterday) backwards.
+    /// (today or yesterday) backwards. `extraDays` (start-of-day dates) count as
+    /// completed too, e.g. days with another workout.
     public static func currentStreak(
         in sessions: [SessionRecord],
         today: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        extraDays: Set<Date> = []
     ) -> Int {
         let completedDays: Set<Date> = Set(
             sessions
                 .compactMap(\.completedAt)
                 .map { calendar.startOfDay(for: $0) }
-        )
+        ).union(extraDays)
         guard !completedDays.isEmpty else { return 0 }
 
         let todayStart = calendar.startOfDay(for: today)
