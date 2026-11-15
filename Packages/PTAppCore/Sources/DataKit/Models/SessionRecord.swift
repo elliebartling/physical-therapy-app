@@ -12,6 +12,9 @@ public final class SessionRecord {
     public var painLevel: Int? = nil
     /// A note for the PT, if any.
     public var note: String? = nil
+    /// The Apple Health workout this session records, when another workout stood in
+    /// for some exercises. Optional so older stores migrate as-is.
+    public var coveringWorkoutID: UUID? = nil
 
     public init(
         id: UUID = UUID(),

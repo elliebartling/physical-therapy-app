@@ -5,7 +5,11 @@ import DataKit
 public final class SessionEngine {
     private let routine: Routine
     private let clock: Clock
-    private var exercises: [Exercise] { routine.exercises.sorted { $0.order < $1.order } }
+    /// Exercises left out, e.g. ones another workout already covered today.
+    private let skipping: Set<UUID>
+    private var exercises: [Exercise] {
+        routine.exercises.filter { !skipping.contains($0.id) }.sorted { $0.order < $1.order }
+    }
 
     public let events: AsyncStream<PhaseEvent>
     private let continuation: AsyncStream<PhaseEvent>.Continuation
@@ -24,9 +28,10 @@ public final class SessionEngine {
     private var skipWhilePaused = false
     private var isTiming = false
 
-    public init(routine: Routine, clock: Clock = SystemClock()) {
+    public init(routine: Routine, clock: Clock = SystemClock(), skipping: Set<UUID> = []) {
         self.routine = routine
         self.clock = clock
+        self.skipping = skipping
         var cont: AsyncStream<PhaseEvent>.Continuation!
         self.events = AsyncStream { cont = $0 }
         self.continuation = cont
