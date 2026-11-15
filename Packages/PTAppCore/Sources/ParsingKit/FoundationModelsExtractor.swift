@@ -1,8 +1,12 @@
 import Foundation
 import FoundationModels
+import DataKit
+import os
 
-/// On-device LLM extractor. The only file in the package allowed to
-/// import FoundationModels.
+private let logger = Logger(subsystem: "PTAppCore", category: "parsing")
+
+/// On-device LLM extractor. One of two files in the package allowed to
+/// import FoundationModels (the other is MediaKit/FoundationModelsRanker.swift).
 public struct FoundationModelsExtractor: RoutineExtractor {
     public init() {}
 
@@ -12,12 +16,13 @@ public struct FoundationModelsExtractor: RoutineExtractor {
     }
 
     public func extract(fromOCRLines lines: [String]) async throws -> ParsedRoutine {
+        let source = lines.joined(separator: "\n")
         let session = LanguageModelSession(instructions: Self.instructions)
         let response = try await session.respond(
-            to: lines.joined(separator: "\n"),
+            to: source,
             generating: GenerableRoutine.self
         )
-        return response.content.toParsedRoutine()
+        return response.content.toParsedRoutine(source: source)
     }
 
     /// The on-device model's context window (about 4k tokens) has to hold the instructions,
@@ -53,7 +58,7 @@ public struct FoundationModelsExtractor: RoutineExtractor {
     public func extract(fromTranscript text: String) async throws -> ParsedRoutine {
         let session = LanguageModelSession(instructions: Self.transcriptInstructions)
         let response = try await session.respond(to: text, generating: GenerableRoutine.self)
-        return response.content.toParsedRoutine()
+        return response.content.toParsedRoutine(source: text)
     }
 
     static let transcriptInstructions = """
@@ -74,6 +79,9 @@ public struct FoundationModelsExtractor: RoutineExtractor {
     sets, restSec, side (one of: both, left, right, alternating), and notes.
     Default sets to 3, reps to 10, restSec to 30, and side to "both" if not stated. \
     Ignore page furniture such as dates, clinic names, page numbers, and contact details.
+    Where the handout prints labelled instruction text for an exercise, copy each block into \
+    sheetHowTo with its heading verbatim, in printed order; leave sheetHowTo empty otherwise. \
+    Never write instructions of your own, and keep that text out of notes.
     """
 }
 
@@ -83,8 +91,8 @@ struct GenerableRoutine {
     var name: String
     var exercises: [GenerableExercise]
 
-    func toParsedRoutine() -> ParsedRoutine {
-        ParsedRoutine(name: name, exercises: exercises.map { $0.toParsedExercise() })
+    func toParsedRoutine(source: String) -> ParsedRoutine {
+        ParsedRoutine(name: name, exercises: exercises.map { $0.toParsedExercise(source: source) })
     }
 }
 
@@ -102,10 +110,12 @@ struct GenerableExercise {
     var restSec: Int
     @Guide(description: "Exactly one of: both, left, right, alternating")
     var side: String
-    @Guide(description: "Extra instructions; empty string when none")
+    @Guide(description: "Incidental remarks that are NOT part of a labelled instruction block (those belong in sheetHowTo); empty string when none")
     var notes: String
+    @Guide(description: "The handout's own labelled instruction blocks for this exercise (for example Setup, Movement, Tip, or whatever headings the sheet uses), in the order printed, each with its heading copied verbatim and its text copied from the sheet. Empty when the sheet has no instruction text for this exercise. Never write or paraphrase instructions that are not on the sheet.")
+    var sheetHowTo: [GenerableHowToSection]
 
-    func toParsedExercise() -> ParsedRoutine.ParsedExercise {
+    func toParsedExercise(source: String) -> ParsedRoutine.ParsedExercise {
         let validSides = ["both", "left", "right", "alternating"]
         let normalizedSide = side.lowercased().trimmingCharacters(in: .whitespaces)
         return .init(
@@ -115,7 +125,57 @@ struct GenerableExercise {
             durationSec: durationSec.map { max(0, $0) },
             restSec: max(0, restSec),
             side: validSides.contains(normalizedSide) ? normalizedSide : "both",
-            notes: notes
+            notes: notes,
+            sheetHowTo: sheetHowTo.compactMap { section in
+                let kept = section.toHowToSection(source: source)
+                if kept == nil {
+                    logger.debug("Dropped a how-to section for \(name): body empty or not found in the source text")
+                }
+                return kept
+            }
         )
+    }
+}
+
+@Generable
+struct GenerableHowToSection {
+    @Guide(description: "The block's heading exactly as printed on the sheet")
+    var heading: String
+    @Guide(description: "The block's text as printed on the sheet")
+    var body: String
+
+    /// Keeps the block only if its text really appears in `source`. The model is asked to copy,
+    /// but a paraphrase is the phone writing rehab guidance, so this is enforced here, not by
+    /// the prompt. A heading that is not on the sheet is blanked rather than shown.
+    func toHowToSection(source: String) -> HowToSection? {
+        let heading = heading.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let haystack = SheetText.normalised(source)
+        let needle = SheetText.normalised(body)
+        guard !needle.isEmpty, haystack.contains(needle) else { return nil }
+        let headingIsOnSheet = haystack.contains(SheetText.normalised(heading))
+        return HowToSection(heading: headingIsOnSheet ? heading : "", body: body)
+    }
+}
+
+/// Comparison form for "is this text on the sheet": OCR, PDF text and the model disagree on
+/// case, whitespace runs, and smart versus straight punctuation, none of which change meaning.
+enum SheetText {
+    static func normalised(_ text: String) -> String {
+        // NFKC folds PDF ligatures (ﬁ, ﬂ) to plain letters; soft hyphens are invisible.
+        let unified = text.precomposedStringWithCompatibilityMapping
+            .replacingOccurrences(of: "\u{00AD}", with: "")
+        // A hyphen that only marks a line break ("stand-\ning") joins the word back up.
+        let joined = unified.replacingOccurrences(
+            of: "[-\u{2010}\u{2011}][ \\t]*\\r?\\n[ \\t]*", with: "", options: .regularExpression)
+        let folded = joined
+            .replacingOccurrences(of: "\u{2018}", with: "'")
+            .replacingOccurrences(of: "\u{2019}", with: "'")
+            .replacingOccurrences(of: "\u{201C}", with: "\"")
+            .replacingOccurrences(of: "\u{201D}", with: "\"")
+            .replacingOccurrences(of: "\u{2013}", with: "-")
+            .replacingOccurrences(of: "\u{2014}", with: "-")
+            .lowercased()
+        return folded.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 }

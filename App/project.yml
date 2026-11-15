@@ -62,6 +62,8 @@ targets:
       - package: PTAppCore
         product: HistoryKit
       - package: PTAppCore
+        product: MediaKit
+      - package: PTAppCore
         product: UI
     settings:
       base:

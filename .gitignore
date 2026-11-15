@@ -9,3 +9,6 @@ build/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Subagent-driven development workspace
+.superpowers/

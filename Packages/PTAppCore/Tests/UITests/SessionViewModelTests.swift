@@ -1,6 +1,7 @@
 import XCTest
 import DataKit
 import SessionKit
+import SwiftUI
 @testable import UI
 
 @MainActor
@@ -66,6 +67,50 @@ final class SessionViewModelTests: XCTestCase {
 
         _ = container
     }
+
+    func test_currentArtIsTheFirstExercisesArtBeforeTheSessionRuns() throws {
+        let container = try ModelContainerFactory.inMemory()
+        let sessionRepo = SessionRepository(context: container.mainContext)
+        let routine = Routine(name: "T", exercises: [
+            Exercise(name: "Bird Dog", target: .repsSets(reps: 10, sets: 1), restSeconds: 0,
+                     side: .both, order: 0, art: .library(slug: "bird-dog")),
+            Exercise(name: "Plank", target: .timeSets(seconds: 30, sets: 1), restSeconds: 0,
+                     side: .both, order: 1, art: ArtChoice.none),
+        ])
+        let vm = SessionViewModel(routine: routine, sessionRepo: sessionRepo, clock: TestClock(),
+                                  audio: nil, haptics: nil)
+        XCTAssertEqual(vm.currentArt, .library(slug: "bird-dog"))
+        _ = container
+    }
+
+
+    func test_currentArtFollowsTheSessionToTheNextExercise() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let sessionRepo = SessionRepository(context: container.mainContext)
+        let routine = Routine(name: "T", exercises: [
+            Exercise(name: "Bird Dog", target: .timeSets(seconds: 5, sets: 1), restSeconds: 0,
+                     side: .both, order: 0, art: .library(slug: "bird-dog")),
+            Exercise(name: "Plank", target: .timeSets(seconds: 5, sets: 1), restSeconds: 0,
+                     side: .both, order: 1, art: ArtChoice.none),
+        ])
+        let vm = SessionViewModel(routine: routine, sessionRepo: sessionRepo, clock: TestClock(),
+                                  audio: nil, haptics: nil)
+        await vm.run()
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(vm.currentExerciseName, "Plank")
+        XCTAssertEqual(vm.currentArt, ArtChoice.none)
+        _ = container
+    }
+
+    func test_figureShowsOnlyForLibraryArtWhileExercisingAtNormalSizes() {
+        let lib = ArtChoice.library(slug: "bird-dog")
+        XCTAssertTrue(SessionView.showsFigure(art: lib, isResting: false, dynamicTypeSize: .large))
+        XCTAssertFalse(SessionView.showsFigure(art: lib, isResting: true, dynamicTypeSize: .large))
+        XCTAssertFalse(SessionView.showsFigure(art: lib, isResting: false, dynamicTypeSize: .accessibility1))
+        XCTAssertFalse(SessionView.showsFigure(art: ArtChoice.none, isResting: false, dynamicTypeSize: .large))
+        XCTAssertFalse(SessionView.showsFigure(art: .unmatched, isResting: false, dynamicTypeSize: .large))
+    }
+
 }
 
 final class TimerReadingTests: XCTestCase {
