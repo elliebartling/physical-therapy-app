@@ -82,6 +82,7 @@ extension HomeViewModel {
     /// What the Start tab says, or nil when there's no routine to start.
     var startInfo: StartInfo? {
         guard hasRoutine else { return nil }
-        return StartInfo(title: isDoneToday ? "Start again" : "Start session")
+        if isDoneToday { return StartInfo(title: "Start again") }
+        return StartInfo(title: canContinue ? "Continue session" : "Start session")
     }
 }

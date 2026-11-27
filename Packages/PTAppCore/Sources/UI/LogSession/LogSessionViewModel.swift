@@ -22,6 +22,8 @@ public final class LogSessionViewModel {
         public var isDone: Bool
         /// The other workout counted for it, e.g. "Yoga".
         public var coveredBy: String? = nil
+        /// An extra: leaving it unchecked doesn't make the session partial.
+        public var isOptional: Bool = false
     }
 
     /// A workout from Apple Health on the day being logged.
@@ -70,12 +72,15 @@ public final class LogSessionViewModel {
             Item(id: exercise.id,
                  name: exercise.name,
                  prescription: Prescription.text(target: exercise.target, side: exercise.side),
-                 isDone: true)
+                 isDone: true,
+                 isOptional: exercise.isOptional)
         }
     }
 
     public var canSave: Bool { items.contains(where: \.isDone) }
     public var isEveryExerciseDone: Bool { items.allSatisfy(\.isDone) }
+    /// Every required exercise is checked: the session counts as complete.
+    public var isComplete: Bool { items.filter { !$0.isOptional }.allSatisfy(\.isDone) }
 
     /// The routine's exercises, for saying what a workout covers.
     public var coverableExercises: [CoverableExercise] {
@@ -180,7 +185,7 @@ public final class LogSessionViewModel {
         }
         let session = SessionRecord(routineID: routineID,
                                     startedAt: loggedAt,
-                                    completedAt: isEveryExerciseDone ? loggedAt : nil,
+                                    completedAt: isComplete ? loggedAt : nil,
                                     exerciseRecords: records)
         let coveredIDs = Set(items.filter { $0.isDone && $0.coveredBy != nil }.map(\.id))
         session.coveringWorkoutID = workouts.first { $0.isCounted && !coveredIDs.isDisjoint(with: $0.covers) }?.id

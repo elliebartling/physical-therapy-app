@@ -14,6 +14,9 @@ public final class Exercise {
     /// Shared by the same exercise across routine versions. Optional so stores
     /// from before versioning migrate; read it through `lineageID`.
     public var lineageStorage: UUID?
+    /// Extra, not required: skipping it doesn't leave the day partial. Optional so older
+    /// stores migrate; read it through `isOptional`.
+    public var optionalStorage: Bool? = nil
 
     public init(
         id: UUID = UUID(),
@@ -24,7 +27,8 @@ public final class Exercise {
         notes: String = "",
         order: Int = 0,
         media: [Asset] = [],
-        lineageID: UUID? = nil
+        lineageID: UUID? = nil,
+        isOptional: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -35,6 +39,13 @@ public final class Exercise {
         self.order = order
         self.media = media
         self.lineageStorage = lineageID
+        self.optionalStorage = isOptional ? true : nil
+    }
+
+    /// An extra: skipping it doesn't leave the day partial or break the streak.
+    public var isOptional: Bool {
+        get { optionalStorage ?? false }
+        set { optionalStorage = newValue ? true : nil }
     }
 
     /// The same exercise across phases: history and charts group by this.

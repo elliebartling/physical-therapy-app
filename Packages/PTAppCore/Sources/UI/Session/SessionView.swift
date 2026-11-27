@@ -49,6 +49,9 @@ public struct SessionView: View {
                 .padding(.horizontal, AppSpacing.screenPadding)
                 .padding(.bottom, AppSpacing.s(1))
             }
+            .onChange(of: reading.remaining) { previous, remaining in
+                viewModel.timerTicked(from: previous, to: remaining)
+            }
         }
         .foregroundStyle(AppColor.ink)
         .opacity(viewModel.isComplete ? 0 : 1)
@@ -68,11 +71,18 @@ public struct SessionView: View {
             guard complete else { return }
             viewModel.endedEarly ? onEnd() : onComplete(viewModel.record)
         }
-        .confirmationDialog("End this session?", isPresented: $confirmingEnd, titleVisibility: .visible) {
-            Button("End session", role: .destructive) { viewModel.endEarly() }
+        .confirmationDialog(viewModel.canFinishNow ? "Finish this session?" : "End this session?",
+                            isPresented: $confirmingEnd, titleVisibility: .visible) {
+            if viewModel.canFinishNow {
+                Button("Finish session") { viewModel.finishNow() }
+            } else {
+                Button("End session", role: .destructive) { viewModel.endEarly() }
+            }
             Button("Keep going", role: .cancel) {}
         } message: {
-            Text("What you've done so far is saved.")
+            Text(viewModel.canFinishNow
+                 ? "Everything required is done; the rest are optional. It counts as a full day."
+                 : "What you've done so far is saved. You can carry on later today from where you stopped.")
         }
         .statusBarHidden()
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
@@ -119,6 +129,20 @@ public struct SessionView: View {
                     .foregroundStyle(AppColor.inkSecondary)
                     .lineLimit(3)
             }
+            if viewModel.currentIsOptional, !viewModel.isResting {
+                Button {
+                    Task { await viewModel.skipCurrentExercise() }
+                } label: {
+                    Label("Skip this one", systemImage: "forward.end")
+                        .font(AppFont.display(15, weight: .semibold))
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .contentShape(Capsule())
+                        .glassEffect(.regular.interactive(), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("It's optional, so the day still counts")
+            }
         }
     }
 
@@ -133,6 +157,7 @@ public struct SessionView: View {
         case .both, .alternating: break
         }
         if case .hold = viewModel.display { parts.append("HOLD") }
+        if viewModel.currentIsOptional { parts.append("OPTIONAL") }
         if viewModel.isPaused { parts.append("PAUSED") }
         return parts.joined(separator: " — ")
     }
@@ -223,8 +248,10 @@ private struct TimerField: View {
         Rectangle()
             .fill(color.fieldTone(for: colorScheme))
             .containerRelativeFrame(.vertical) { length, _ in length * 0.55 * CGFloat(fraction) }
-            .frame(maxWidth: .infinity)
-            .ignoresSafeArea(edges: .bottom)
+            // Fill the screen's full width and height, then sit at the very bottom, past the
+            // home indicator, so the field runs to the edge.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .ignoresSafeArea()
             .animation(reduceMotion ? nil : .linear(duration: 0.25), value: fraction)
             .allowsHitTesting(false)
             .accessibilityHidden(true)

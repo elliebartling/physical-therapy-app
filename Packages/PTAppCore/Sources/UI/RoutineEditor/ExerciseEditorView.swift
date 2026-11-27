@@ -63,6 +63,11 @@ public struct ExerciseEditorView: View {
             Section("Notes") {
                 TextField("Notes", text: $exercise.notes, axis: .vertical).lineLimit(3...8)
             }
+            Section {
+                Toggle("Optional", isOn: $exercise.isOptional)
+            } footer: {
+                Text("An extra. Skipping it doesn't leave the day partial or break your streak.")
+            }
         }
         .navigationTitle("Exercise")
         .navigationBarTitleDisplayMode(.inline)

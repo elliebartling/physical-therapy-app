@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import DataKit
+import HistoryKit
 import SessionKit
 
 @MainActor
@@ -21,6 +22,9 @@ public final class SessionViewModel {
     private let haptics: HapticService?
     private let health: HealthRecorder?
     private let ratingTiming: RatingTiming
+    private let countdownHaptics: Bool
+    /// Exercises already done or covered today, left out of this session.
+    private let alreadyDone: Set<UUID>
 
     public private(set) var currentExerciseName = ""
     public private(set) var currentNotes = ""
@@ -29,6 +33,8 @@ public final class SessionViewModel {
     public private(set) var currentSet: Int = 0
     public private(set) var totalSets: Int = 0
     public private(set) var currentSide: Side = .both
+    /// The current exercise is an extra that can be skipped without leaving the day partial.
+    public private(set) var currentIsOptional = false
     public private(set) var display: Display = .starting
     /// When the current `display` began; drives the draining timer field.
     public private(set) var displayStartedAt: Date = .now
@@ -58,8 +64,11 @@ public final class SessionViewModel {
                 haptics: HapticService? = HapticService(),
                 health: HealthRecorder? = HealthRecorder(),
                 ratingTiming: RatingTiming = .load(),
-                skipping: Set<UUID> = []) {
+                skipping: Set<UUID> = [],
+                countdownHaptics: Bool = SessionPreferences.countdownHaptics()) {
         self.routine = routine
+        self.alreadyDone = skipping
+        self.countdownHaptics = countdownHaptics
         self.engine = SessionEngine(routine: routine, clock: clock, skipping: skipping)
         self.sessionRepo = sessionRepo
         self.audio = audio
@@ -97,6 +106,40 @@ public final class SessionViewModel {
     public func resume() { engine.resume() }
     public func completeCurrentSet() async { try? await engine.completeCurrentSet() }
     public func skipCurrentSet() async { try? await engine.skipCurrentSet() }
+    /// Leaves out the rest of the current exercise, e.g. an optional one.
+    public func skipCurrentExercise() async { try? await engine.skipCurrentExercise() }
+
+    /// Every required exercise is done, here or earlier today, so ending now completes the day.
+    public var canFinishNow: Bool {
+        let doneHere = Set(sessionRecord.exerciseRecords.filter { $0.status == .completed }.map(\.exerciseID))
+        return DayProgress.coversRequired(routine.exercises, done: alreadyDone.union(doneHere))
+    }
+
+    /// Ends the session as complete, once only optional exercises are left.
+    public func finishNow() {
+        guard !isComplete, canFinishNow else { return }
+        engine.pause()
+        let finishedAt = Date.now
+        sessionRecord.completedAt = finishedAt
+        try? sessionRepo.insert(sessionRecord)
+        isComplete = true
+        saveToHealth(endedAt: finishedAt, finished: true)
+    }
+
+    /// A light tap on each of the last three seconds of a hold or rest.
+    public func timerTicked(from previous: Int, to remaining: Int) {
+        guard countdownHaptics,
+              Self.isCountdownTick(display: display, isPaused: isPaused, from: previous, to: remaining) else { return }
+        haptics?.fire(.lightTick)
+    }
+
+    static func isCountdownTick(display: Display, isPaused: Bool, from previous: Int, to remaining: Int) -> Bool {
+        guard !isPaused, remaining < previous, (1...3).contains(remaining) else { return false }
+        switch display {
+        case .hold, .rest: return true
+        case .reps, .starting: return false
+        }
+    }
 
     /// The session's record, for the summary once it's complete.
     public var record: SessionRecord { sessionRecord }
@@ -156,6 +199,7 @@ public final class SessionViewModel {
             currentExercise = routine.exercises.first { $0.id == id }
             currentExerciseName = currentExercise?.name ?? ""
             currentNotes = currentExercise?.notes ?? ""
+            currentIsOptional = currentExercise?.isOptional ?? false
             totalSets = currentExercise?.target.totalSets ?? 0
             exerciseIndex = index
             totalExercises = total
@@ -187,6 +231,10 @@ public final class SessionViewModel {
             if ratingTiming == .afterEach {
                 ratingPrompt = RatingPrompt(id: record.id, exerciseName: currentExerciseName)
             }
+        case .exerciseSkipped(let id):
+            sessionRecord.exerciseRecords.append(
+                ExerciseRecord(exerciseID: id, status: .skipped, startedAt: exerciseStartedAt)
+            )
         case .sessionCompleted:
             audio?.play(.sessionDone)
             haptics?.fire(.success)
