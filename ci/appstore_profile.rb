@@ -14,7 +14,9 @@
 #   4. installs it and writes `uuid=` to $GITHUB_OUTPUT.
 #
 # Env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH, BUNDLE_ID, DIST_CERT_PEM_PATH,
-#      PROFILE_NAME, CAPABILITIES (comma-separated, optional).
+#      PROFILE_NAME, CAPABILITIES (comma-separated, optional),
+#      BUNDLE_NAME (optional: registers BUNDLE_ID under this name if it's missing,
+#      e.g. for an app extension).
 # Only Ruby's standard library, which every macOS runner has.
 
 require 'fileutils'
@@ -35,6 +37,7 @@ BUNDLE_ID = env('BUNDLE_ID')
 CERT_PEM_PATH = env('DIST_CERT_PEM_PATH')
 PROFILE_NAME = env('PROFILE_NAME')
 CAPABILITIES = ENV.fetch('CAPABILITIES', '').split(',').map(&:strip).reject(&:empty?)
+BUNDLE_NAME = ENV.fetch('BUNDLE_NAME', '')
 
 def base64url(bytes) = [bytes].pack('m0').tr('+/', '-_').delete('=')
 
@@ -72,6 +75,12 @@ def hex_serial(value) = value.to_s.upcase.sub(/\A0+/, '')
 # 1. The bundle ID and its capabilities.
 bundle = api('get', "/v1/bundleIds?#{query('filter[identifier]' => BUNDLE_ID, 'limit' => 200)}")['data']
          .find { |b| b.dig('attributes', 'identifier') == BUNDLE_ID }
+if bundle.nil? && !BUNDLE_NAME.empty?
+  bundle = api('post', '/v1/bundleIds', {
+    data: { type: 'bundleIds', attributes: { identifier: BUNDLE_ID, name: BUNDLE_NAME, platform: 'IOS' } }
+  })['data']
+  puts "Registered bundle ID #{BUNDLE_ID}."
+end
 abort "::error::Bundle ID #{BUNDLE_ID} isn't registered in this account." unless bundle
 
 enabled = api('get', "/v1/bundleIds/#{bundle['id']}/bundleIdCapabilities")['data']

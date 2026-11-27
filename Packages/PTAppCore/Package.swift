@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "HistoryKit", targets: ["HistoryKit"]),
         .library(name: "MediaKit", targets: ["MediaKit"]),
         .library(name: "UI", targets: ["UI"]),
+        .library(name: "LiveSession", targets: ["LiveSession"]),
     ],
     dependencies: [
         .package(url: "https://github.com/nalexn/ViewInspector", from: "0.10.0"),
@@ -30,7 +31,9 @@ let package = Package(
             exclude: ["Resources/generate-catalog.sh"],
             resources: [.process("Resources")]
         ),
-        .target(name: "UI", dependencies: ["DataKit", "ParsingKit", "SessionKit", "HistoryKit", "MediaKit"]),
+        // Shared with the widget extension, so kept to ActivityKit and App Intents.
+        .target(name: "LiveSession"),
+        .target(name: "UI", dependencies: ["DataKit", "ParsingKit", "SessionKit", "HistoryKit", "MediaKit", "LiveSession"]),
         .testTarget(name: "DataKitTests", dependencies: ["DataKit"]),
         .testTarget(name: "ParsingKitTests", dependencies: ["ParsingKit"], resources: [.process("Fixtures")]),
         .testTarget(name: "SessionKitTests", dependencies: ["SessionKit"]),
@@ -40,6 +43,7 @@ let package = Package(
             name: "UITests",
             dependencies: [
                 "UI",
+                "LiveSession",
                 .product(name: "ViewInspector", package: "ViewInspector"),
             ]
         ),

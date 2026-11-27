@@ -48,6 +48,13 @@ targets:
         NSHealthShareUsageDescription: "If you turn on Show other workouts in Settings, Mend reads your workouts from Health, such as runs, rides and yoga, to show them beside your PT sessions and pain. It never changes them, and they stay on this iPhone."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # A guided session runs as a Health workout session so its timer, cues and
+        # voice carry on in the background, with a Live Activity on the Lock Screen.
+        # `workout-processing` is watchOS-only (App Store Connect rejects it on
+        # iOS); on iPhone the workout session itself keeps the app running.
+        UIBackgroundModes:
+          - audio
+        NSSupportsLiveActivities: true
         UIAppFonts:
           - JetBrainsMono-Regular.ttf
           - JetBrainsMono-Medium.ttf
@@ -65,6 +72,9 @@ targets:
         product: MediaKit
       - package: PTAppCore
         product: UI
+      - package: PTAppCore
+        product: LiveSession
+      - target: MendWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ellenbartling.ptroutine
@@ -84,3 +94,35 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Apple Distribution"
           PROVISIONING_PROFILE_SPECIFIER: "$(MEND_APPSTORE_PROFILE)"
+
+  # The Live Activity for a guided session (Lock Screen and Dynamic Island).
+  MendWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MendWidgets
+    info:
+      path: MendWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Mend
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    dependencies:
+      - package: PTAppCore
+        product: LiveSession
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ellenbartling.ptroutine.widgets
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "$(MEND_WIDGETS_PROFILE)"

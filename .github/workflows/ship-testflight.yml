@@ -126,6 +126,16 @@ jobs:
           CAPABILITIES=HEALTHKIT \
             ruby ci/appstore_profile.rb
 
+      - name: Fetch widget extension provisioning profile
+        id: widgets_profile
+        run: |
+          ASC_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+          DIST_CERT_PEM_PATH="$RUNNER_TEMP/dist.pem" \
+          BUNDLE_ID=com.ellenbartling.ptroutine.widgets \
+          BUNDLE_NAME="Mend Widgets" \
+          PROFILE_NAME="Mend Widgets App Store (CI)" \
+            ruby ci/appstore_profile.rb
+
       - name: Archive (signed)
         run: |
           rm -rf build
@@ -139,7 +149,8 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath build/Mend.xcarchive \
             -derivedDataPath build/DerivedData \
-            MEND_APPSTORE_PROFILE="${{ steps.profile.outputs.uuid }}"
+            MEND_APPSTORE_PROFILE="${{ steps.profile.outputs.uuid }}" \
+            MEND_WIDGETS_PROFILE="${{ steps.widgets_profile.outputs.uuid }}"
 
       - name: Export signed IPA
         run: |
@@ -147,6 +158,7 @@ jobs:
           OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
           cp ci/ExportOptions.plist "$OPTIONS"
           /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.ellenbartling.ptroutine ${{ steps.profile.outputs.uuid }}" "$OPTIONS"
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.ellenbartling.ptroutine.widgets ${{ steps.widgets_profile.outputs.uuid }}" "$OPTIONS"
           xcodebuild -exportArchive \
             -archivePath build/Mend.xcarchive \
             -exportPath build/export \
