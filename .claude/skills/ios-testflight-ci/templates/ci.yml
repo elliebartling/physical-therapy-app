@@ -1,0 +1,84 @@
+name: CI
+
+# Builds the app and runs the test suite on every PR and every push to main.
+# Always reports (no paths-ignore) so it can safely be a required check —
+# a path-filtered workflow that never runs leaves a required check Pending
+# forever and blocks doc-only PRs.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$NEWEST" ]; then sudo xcode-select -s "$NEWEST/Contents/Developer"; fi
+          xcodebuild -version
+
+      # Remove these two steps if the repo doesn't use XcodeGen.
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate --spec __PROJECT_DIR__/project.yml --project __PROJECT_DIR__
+
+      - name: Pick a simulator
+        run: |
+          # Don't hardcode a device name; runner images rotate them.
+          # The build/test steps pin arch=arm64: runners list each simulator
+          # twice (arm64 and x86_64/Rosetta), and when xcodebuild picks the
+          # Rosetta one the test step stalls silently until the job timeout.
+          UDID=$(xcrun simctl list devices available -j \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; ds=[x for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]; print(ds[-1]["udid"])')
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          echo "Using simulator $UDID"
+
+      - name: Build app target
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project __XCODEPROJ__ -scheme __APP_SCHEME__ \
+            -destination "platform=iOS Simulator,id=$SIM_UDID,arch=arm64" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run tests
+        # Size this to a cold build plus the suite; anything past it is a stall.
+        timeout-minutes: 12
+        run: |
+          set -o pipefail
+          cd __TEST_DIR__
+          xcodebuild test -scheme __TEST_SCHEME__ \
+            -destination "platform=iOS Simulator,id=$SIM_UDID,arch=arm64" \
+            -resultBundlePath "$RUNNER_TEMP/tests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO | tee "$RUNNER_TEMP/test.log"
+
+      - name: Assert every test bundle ran
+        run: |
+          # A green run with a bundle silently dropped looks identical to a
+          # correct one — pin the bundle set, not a test count.
+          FAIL=0
+          for B in __TEST_BUNDLES__; do
+            if ! grep -q "Test Suite '$B.xctest' passed" "$RUNNER_TEMP/test.log"; then
+              echo "::error::$B did not run or did not pass"; FAIL=1
+            fi
+          done
+          exit $FAIL

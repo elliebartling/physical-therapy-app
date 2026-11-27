@@ -1,0 +1,211 @@
+name: Ship TestFlight
+
+# Ships a signed build of __APP_NAME__ to App Store Connect / TestFlight.
+# Manual "Run workflow" only — ship deliberately, one build you choose.
+#
+# Required secrets, stored on the `testflight` environment (not the repo),
+# which only the main branch may deploy from. That keeps the signing key out
+# of reach of a workflow edited on a feature branch. They are team-level and
+# can be shared by every repo on the team:
+#   APP_STORE_CONNECT_API_KEY_ID    — Key ID
+#   APP_STORE_CONNECT_ISSUER_ID     — Issuer UUID
+#   APP_STORE_CONNECT_API_KEY_P8    — full .p8 private key contents
+#   DIST_CERT_P12_BASE64            — Apple Distribution cert, base64 .p12
+#   DIST_CERT_PASSWORD              — the .p12 export password
+#
+# Signing is manual, with the distribution certificate above and an App Store
+# profile that ci/appstore_profile.rb fetches (or creates) through the API key,
+# enabling capabilities on the App ID first if needed. Automatic signing mints
+# a new Apple Development certificate on every fresh runner until the account
+# hits Apple's limit, so nothing here may need a development certificate.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ship-testflight
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ship:
+    runs-on: macos-26
+    timeout-minutes: 60
+    environment: testflight
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      # 0 if nothing was ever uploaded for this app; otherwise higher than the
+      # largest build number already in App Store Connect.
+      BUILD_NUMBER_OFFSET: 0
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check App Store Connect secrets
+        env:
+          ASC_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_API_KEY_P8" ]; then
+            echo "::error::Missing App Store Connect secrets. Set APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_ISSUER_ID, and APP_STORE_CONNECT_API_KEY_P8 on the testflight environment."
+            exit 1
+          fi
+
+      - name: Select Xcode 26
+        run: |
+          # App Store Connect rejects uploads built with an outdated SDK.
+          NEWEST=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$NEWEST" ]; then sudo xcode-select -s "$NEWEST/Contents/Developer"; fi
+          xcodebuild -version
+          IOS_SDK=$(xcodebuild -showsdks 2>/dev/null | sed -nE 's/.*iphoneos([0-9]+).*/\1/p' | sort -n | tail -1)
+          echo "iOS SDK: ${IOS_SDK:-unknown}"
+          if [ -z "$IOS_SDK" ] || [ "$IOS_SDK" -lt 26 ]; then
+            echo "::error::iOS SDK $IOS_SDK is too old; App Store Connect requires iOS 26+."
+            exit 1
+          fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Set build number
+        id: version
+        run: |
+          BUILD=$(( ${{ github.run_number }} + BUILD_NUMBER_OFFSET ))
+          MARKETING=$(grep -E '^\s*MARKETING_VERSION:' __PROJECT_DIR__/project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          sed -i '' -E "s/CURRENT_PROJECT_VERSION: \"[^\"]+\"/CURRENT_PROJECT_VERSION: \"${BUILD}\"/" __PROJECT_DIR__/project.yml
+          echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "marketing=${MARKETING}" >> "$GITHUB_OUTPUT"
+          echo "Shipping __APP_NAME__ ${MARKETING} (${BUILD})"
+
+      - name: Generate project
+        run: xcodegen generate --spec __PROJECT_DIR__/project.yml --project __PROJECT_DIR__
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          printf '%s\n' "$ASC_API_KEY_P8" > "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Import distribution certificate
+        env:
+          DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
+          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        run: |
+          if [ -z "$DIST_CERT_P12_BASE64" ] || [ -z "$DIST_CERT_PASSWORD" ]; then
+            echo "::error::Missing DIST_CERT_P12_BASE64 / DIST_CERT_PASSWORD secrets."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/ship.keychain-db"
+          KEYCHAIN_PASS=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          printf '%s' "$DIST_CERT_P12_BASE64" | base64 -d > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "$DIST_CERT_PASSWORD" -A -f pkcs12 -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/dist.p12"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN" > /dev/null
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Fetch App Store provisioning profile
+        id: profile
+        run: |
+          security find-certificate -c "Apple Distribution" -p "$RUNNER_TEMP/ship.keychain-db" > "$RUNNER_TEMP/dist.pem"
+          ASC_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+          DIST_CERT_PEM_PATH="$RUNNER_TEMP/dist.pem" \
+          BUNDLE_ID=__BUNDLE_ID__ \
+          PROFILE_NAME="__APP_NAME__ App Store (CI)" \
+          CAPABILITIES=__CAPABILITIES__ \
+            ruby ci/appstore_profile.rb
+
+      # One step like this per app extension. BUNDLE_NAME lets the script
+      # register the extension's bundle ID if it doesn't exist yet.
+      # Delete this step if the app has no extensions.
+      - name: Fetch widget extension provisioning profile
+        id: widgets_profile
+        run: |
+          ASC_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+          DIST_CERT_PEM_PATH="$RUNNER_TEMP/dist.pem" \
+          BUNDLE_ID=__BUNDLE_ID__.widgets \
+          BUNDLE_NAME="__APP_NAME__ Widgets" \
+          PROFILE_NAME="__APP_NAME__ Widgets App Store (CI)" \
+            ruby ci/appstore_profile.rb
+
+      - name: Archive (signed)
+        run: |
+          rm -rf build
+          set -o pipefail
+          # Release signing is manual (project.yml); these name the profiles
+          # the steps above installed.
+          xcodebuild archive \
+            -project __XCODEPROJ__ \
+            -scheme __APP_SCHEME__ \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            -derivedDataPath build/DerivedData \
+            APP_APPSTORE_PROFILE="${{ steps.profile.outputs.uuid }}" \
+            WIDGETS_APPSTORE_PROFILE="${{ steps.widgets_profile.outputs.uuid }}"
+
+      - name: Export signed IPA
+        run: |
+          set -o pipefail
+          OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+          cp ci/ExportOptions.plist "$OPTIONS"
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:__BUNDLE_ID__ ${{ steps.profile.outputs.uuid }}" "$OPTIONS"
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:__BUNDLE_ID__.widgets ${{ steps.widgets_profile.outputs.uuid }}" "$OPTIONS"
+          xcodebuild -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist "$OPTIONS" \
+            | tee /tmp/export.log
+          ls build/export
+          test -f build/export/__IPA_NAME__.ipa
+
+      - name: Check IPA build number
+        run: |
+          # App Store Connect rejects a reused build number, and only after
+          # the whole upload. Fail here, fast, if the number didn't land.
+          rm -rf "$RUNNER_TEMP/ipa" && mkdir "$RUNNER_TEMP/ipa"
+          unzip -q build/export/__IPA_NAME__.ipa -d "$RUNNER_TEMP/ipa"
+          PLIST=$(ls -d "$RUNNER_TEMP"/ipa/Payload/*.app)/Info.plist
+          GOT=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")
+          WANT=${{ steps.version.outputs.build }}
+          echo "IPA CFBundleVersion=$GOT (expected $WANT)"
+          if [ "$GOT" != "$WANT" ]; then
+            echo "::error::IPA build number is $GOT, expected $WANT. Info.plist isn't reading CURRENT_PROJECT_VERSION."
+            exit 1
+          fi
+
+      - name: Collect signing diagnostics
+        if: failure()
+        run: |
+          mkdir -p build/diagnostics
+          cp /tmp/export.log build/diagnostics/ 2>/dev/null || true
+          find /var/folders -type d -name "*.xcdistributionlogs" -exec cp -R {} build/diagnostics/ \; 2>/dev/null || true
+
+      - name: Upload signing diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signing-diagnostics
+          path: build/diagnostics
+          if-no-files-found: warn
+
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app \
+            -f build/export/__IPA_NAME__.ipa \
+            -t ios \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+          echo "Uploaded __APP_NAME__ ${{ steps.version.outputs.marketing }} (${{ steps.version.outputs.build }}) — processing usually takes 5–15 minutes."
