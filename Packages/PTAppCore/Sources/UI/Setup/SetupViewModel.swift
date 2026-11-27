@@ -3,6 +3,7 @@ import UIKit
 import Observation
 import DataKit
 import ParsingKit
+import MediaKit
 import os
 
 private let logger = Logger(subsystem: "PTAppCore", category: "setup")
@@ -25,6 +26,8 @@ public final class SetupViewModel {
 
     private let routineRepo: RoutineRepository
     private let parser: RoutineParser
+    private let matcher: ExerciseMatcher
+    private let matchTimeout: Duration
 
     public var phase: Phase = .idle
     public var draft: ParsedRoutine = .init(name: "My routine", exercises: [])
@@ -34,9 +37,21 @@ public final class SetupViewModel {
 
     public var isReplacing: Bool { current != nil }
 
-    public init(routineRepo: RoutineRepository, parser: RoutineParser = .init()) {
+    /// `matchTimeout` caps how long picture matching may hold up the editor.
+    public init(
+        routineRepo: RoutineRepository,
+        parser: RoutineParser = .init(),
+        matcher: ExerciseMatcher = .init(),
+        // Provisional: no on-device measurement yet. One inference per exercise, effectively
+        // serialised, each with a ~6.2 KB widened prompt. Exceeding it leaves exercises
+        // `.unmatched` (retryable from the picker). If it proves too slow, batch into one
+        // call or fill matches in after the editor appears; don't keep raising this.
+        matchTimeout: Duration = .seconds(20)
+    ) {
         self.routineRepo = routineRepo
         self.parser = parser
+        self.matcher = matcher
+        self.matchTimeout = matchTimeout
         do {
             if let routine = try routineRepo.fetchActive() {
                 current = CurrentRoutine(name: routine.name, phase: routine.phase,
@@ -144,9 +159,13 @@ public final class SetupViewModel {
         noTextMessage: String
     ) async {
         do {
-            let parsed = try await work()
+            var parsed = try await work()
+            let (exercises, imported) = await withSuggestedArt(parsed.exercises)
+            parsed.exercises = exercises
             draft = parsed
-            editorVM = RoutineEditorViewModel(parsed: parsed)
+            let editor = RoutineEditorViewModel(parsed: parsed)
+            editor.importedSuggestions = imported
+            editorVM = editor
             phase = .editing
         } catch {
             draft = .init(name: "My routine", exercises: [])
@@ -159,5 +178,62 @@ public final class SetupViewModel {
                 phase = .failed("Something went wrong reading that. Try again, or enter your routine manually.")
             }
         }
+    }
+
+    private enum MatchEvent: Sendable {
+        case matched(Int, MatchResult)
+        case timedOut
+        case cancelled
+    }
+
+    /// Suggests a picture for every exercise, concurrently. This never fails the import:
+    /// anything that doesn't finish in time stays `.unmatched` (never matched, so a later
+    /// retry is still possible) and the exercises keep their order.
+    private func withSuggestedArt(
+        _ exercises: [ParsedRoutine.ParsedExercise]
+    ) async -> ([ParsedRoutine.ParsedExercise], [UUID: ImportedSuggestions]) {
+        guard !exercises.isEmpty else { return (exercises, [:]) }
+        let matcher = matcher
+        let timeout = matchTimeout
+        let requests = exercises.enumerated().map { (index: $0.offset, name: $0.element.name, notes: $0.element.notes) }
+
+        let results: [Int: MatchResult] = await withTaskGroup(of: MatchEvent.self) { group in
+            for request in requests {
+                group.addTask {
+                    let result = await matcher.match(name: request.name, notes: request.notes)
+                    return .matched(request.index, result)
+                }
+            }
+            group.addTask {
+                // Fires only if matching is still running at the deadline.
+                do { try await Task.sleep(for: timeout) } catch { return .cancelled }
+                return .timedOut
+            }
+            var found: [Int: MatchResult] = [:]
+            var pending = requests.count
+            loop: while pending > 0, let event = await group.next() {
+                switch event {
+                case .matched(let index, let result):
+                    found[index] = result
+                    pending -= 1
+                case .timedOut:
+                    logger.error("Picture matching timed out; leaving the rest unmatched")
+                    break loop
+                case .cancelled:
+                    continue
+                }
+            }
+            group.cancelAll()
+            return found
+        }
+
+        var matched = exercises
+        var imported: [UUID: ImportedSuggestions] = [:]
+        for (index, result) in results where matched.indices.contains(index) && matched[index].art == .unmatched {
+            matched[index].art = result.choice
+            imported[matched[index].id] = ImportedSuggestions(
+                name: matched[index].name, notes: matched[index].notes, result: result)
+        }
+        return (matched, imported)
     }
 }

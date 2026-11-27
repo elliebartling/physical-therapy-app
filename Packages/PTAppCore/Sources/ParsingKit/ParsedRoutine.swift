@@ -11,11 +11,15 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
         public var restSec: Int
         public var side: String
         public var notes: String
+        public var art: ArtChoice
+        /// The handout's own instruction prose; never merged into `notes`.
+        public var sheetHowTo: [HowToSection]
         /// An extra the person marked; never read from a sheet.
         public var isOptional: Bool
 
         public init(id: UUID = UUID(), name: String, reps: Int?, sets: Int, durationSec: Int?, restSec: Int, side: String,
-                    notes: String, isOptional: Bool = false) {
+                    notes: String, art: ArtChoice = .unmatched, sheetHowTo: [HowToSection] = [],
+                    isOptional: Bool = false) {
             self.id = id
             self.name = name
             self.reps = reps
@@ -24,11 +28,13 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
             self.restSec = restSec
             self.side = side
             self.notes = notes
+            self.art = art
+            self.sheetHowTo = sheetHowTo
             self.isOptional = isOptional
         }
 
         private enum CodingKeys: String, CodingKey {
-            case id, name, reps, sets, durationSec, restSec, side, notes, isOptional
+            case id, name, reps, sets, durationSec, restSec, side, notes, art, sheetHowTo, isOptional
         }
 
         public init(from decoder: Decoder) throws {
@@ -41,6 +47,8 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
             self.restSec = try c.decode(Int.self, forKey: .restSec)
             self.side = try c.decode(String.self, forKey: .side)
             self.notes = try c.decode(String.self, forKey: .notes)
+            self.art = (try? c.decode(ArtChoice.self, forKey: .art)) ?? .unmatched
+            self.sheetHowTo = (try? c.decode([HowToSection].self, forKey: .sheetHowTo)) ?? []
             self.isOptional = (try? c.decodeIfPresent(Bool.self, forKey: .isOptional)) ?? false
         }
     }
@@ -72,6 +80,8 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
                 side: side,
                 notes: p.notes,
                 order: idx,
+                art: p.art,
+                sheetHowTo: p.sheetHowTo,
                 isOptional: p.isOptional
             )
         }

@@ -14,6 +14,7 @@ public final class HomeViewModel {
         public let number: String
         public let name: String
         public let prescription: String
+        public let art: ArtChoice
         /// The other workout that stood in for it today, e.g. "Yoga".
         public var coveredBy: String? = nil
         /// Done earlier today in a session that didn't finish; Start carries on after it.
@@ -137,6 +138,7 @@ public final class HomeViewModel {
                 number: String(format: "%02d", index + 1),
                 name: exercise.name,
                 prescription: Prescription.text(target: exercise.target, side: exercise.side),
+                art: exercise.art,
                 coveredBy: covered[exercise.id],
                 isDone: covered[exercise.id] == nil && skipping.contains(exercise.id),
                 isOptional: exercise.isOptional

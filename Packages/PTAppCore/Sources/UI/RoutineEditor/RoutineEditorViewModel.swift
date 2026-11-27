@@ -7,6 +7,8 @@ import ParsingKit
 public final class RoutineEditorViewModel {
     public var name: String
     public var exercises: [ParsedRoutine.ParsedExercise]
+    /// The import's matcher output per exercise id; empty for a saved routine.
+    var importedSuggestions: [UUID: ImportedSuggestions] = [:]
     /// The pause between exercises; nil follows the app's setting.
     public var transitionSeconds: Int?
 
@@ -22,7 +24,7 @@ public final class RoutineEditorViewModel {
 
     public func addExercise() {
         exercises.append(.init(name: "New exercise", reps: 10, sets: 3,
-                               durationSec: nil, restSec: 30, side: "both", notes: ""))
+                               durationSec: nil, restSec: 30, side: "both", notes: "", art: .unmatched))
     }
     public func remove(at offsets: IndexSet) { exercises.remove(atOffsets: offsets) }
     public func move(fromOffsets: IndexSet, toOffset: Int) {

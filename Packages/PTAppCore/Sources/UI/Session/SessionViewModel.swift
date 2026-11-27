@@ -43,6 +43,8 @@ public final class SessionViewModel {
 
     public private(set) var currentExerciseName = ""
     public private(set) var currentNotes = ""
+    /// The picture for the current exercise; set from the first exercise up front so the screen never starts blank.
+    public private(set) var currentArt: ArtChoice = ArtChoice.unmatched
     public private(set) var exerciseIndex = 0
     public private(set) var totalExercises = 0
     public private(set) var currentSet: Int = 0
@@ -102,6 +104,7 @@ public final class SessionViewModel {
         self.health = health
         self.ratingTiming = ratingTiming
         self.sessionRecord = SessionRecord(routineID: routine.id, startedAt: .now)
+        self.currentArt = routine.orderedExercises.first?.art ?? ArtChoice.unmatched
     }
 
     public var isResting: Bool {
@@ -347,6 +350,7 @@ public final class SessionViewModel {
             currentExercise = routine.exercises.first { $0.id == id }
             currentExerciseName = currentExercise?.name ?? ""
             currentNotes = currentExercise?.notes ?? ""
+            currentArt = currentExercise?.art ?? ArtChoice.unmatched
             currentIsOptional = currentExercise?.isOptional ?? false
             upNext = nil
             if index == 0, announcesNext, let currentExercise {

@@ -36,11 +36,17 @@
 	<string>Used to pick photos of your PT handout.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Turns what you say into text on this iPhone so Mend can build your routine.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIAppFonts</key>
 	<array>
 		<string>JetBrainsMono-Regular.ttf</string>
 		<string>JetBrainsMono-Medium.ttf</string>
 		<string>JetBrainsMono-Bold.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

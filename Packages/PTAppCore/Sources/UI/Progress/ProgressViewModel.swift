@@ -40,6 +40,10 @@ public final class ProgressViewModel {
         /// The last few times it came up, oldest first.
         public let recent: [Mark]
         public let trend: ExerciseTrend?
+        /// Read from the live exercise; rows exist only for the active routine, so it is always known.
+        public let art: ArtChoice
+        /// The handout's own instruction text, in sheet order.
+        public let sheetHowTo: [HowToSection]
     }
 
     public struct SessionItem: Identifiable, Equatable {
@@ -323,7 +327,9 @@ public final class ProgressViewModel {
                         today: today, calendar: calendar
                     ),
                     isOptional: exercise.isOptional
-                )
+                ),
+                art: exercise.art,
+                sheetHowTo: exercise.sheetHowTo
             )
         }
 

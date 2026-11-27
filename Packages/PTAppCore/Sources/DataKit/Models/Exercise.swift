@@ -14,6 +14,13 @@ public final class Exercise {
     /// Shared by the same exercise across routine versions. Optional so stores
     /// from before versioning migrate; read it through `lineageID`.
     public var lineageStorage: UUID?
+    /// Raw `ArtChoice`. Optional so stores from before illustrations migrate;
+    /// read it through `art`.
+    public var artRaw: String?
+    /// `[HowToSection]` encoded as JSON: the handout's own instruction prose.
+    /// Optional so stores from before this field migrate; read it through `sheetHowTo`.
+    /// Never mirrored into `notes`, which the session screen shows mid-exercise.
+    public var sheetHowToData: Data?
     /// Extra, not required: skipping it doesn't leave the day partial. Optional so older
     /// stores migrate; read it through `isOptional`.
     public var optionalStorage: Bool? = nil
@@ -28,6 +35,8 @@ public final class Exercise {
         order: Int = 0,
         media: [Asset] = [],
         lineageID: UUID? = nil,
+        art: ArtChoice = .unmatched,
+        sheetHowTo: [HowToSection] = [],
         isOptional: Bool = false
     ) {
         self.id = id
@@ -39,6 +48,8 @@ public final class Exercise {
         self.order = order
         self.media = media
         self.lineageStorage = lineageID
+        self.artRaw = art.rawValue
+        self.sheetHowToData = sheetHowTo.isEmpty ? nil : (try? JSONEncoder().encode(sheetHowTo))
         self.optionalStorage = isOptional ? true : nil
     }
 
@@ -60,8 +71,20 @@ public final class Exercise {
         set { targetData = (try? JSONEncoder().encode(newValue)) ?? Data() }
     }
 
+    /// What the handout itself said about how to do this, in sheet order; empty when it said nothing.
+    public var sheetHowTo: [HowToSection] {
+        get { sheetHowToData.flatMap { try? JSONDecoder().decode([HowToSection].self, from: $0) } ?? [] }
+        set { sheetHowToData = newValue.isEmpty ? nil : (try? JSONEncoder().encode(newValue)) }
+    }
+
     public var side: Side {
         get { Side(rawValue: sideRaw) ?? .both }
         set { sideRaw = newValue.rawValue }
+    }
+
+    /// Which illustration to show; `.unmatched` when unset or unrecognised.
+    public var art: ArtChoice {
+        get { artRaw.flatMap(ArtChoice.init(rawValue:)) ?? .unmatched }
+        set { artRaw = newValue.rawValue }
     }
 }

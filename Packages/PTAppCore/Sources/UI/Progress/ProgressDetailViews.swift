@@ -25,6 +25,7 @@ struct ExerciseProgressView: View {
         let phases = viewModel.phases(forExercise: exerciseID)
         let showsPhases = phases.count > 1
         return VStack(alignment: .leading, spacing: 0) {
+            ExerciseIllustration(art: row.art)
             Text(row.name)
                 .font(AppFont.display(30, weight: .bold))
                 .tracking(-1)
@@ -36,6 +37,7 @@ struct ExerciseProgressView: View {
             if let insight = viewModel.insight(forExercise: exerciseID) {
                 InsightCard(insight: Self.retitled(insight)).padding(.top, 18)
             }
+            SheetHowToView(sections: row.sheetHowTo)
             figures(row).padding(.top, 24)
             feel.padding(.top, 32)
             if showsPhases {

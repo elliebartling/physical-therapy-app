@@ -1,6 +1,7 @@
 import SwiftUI
 import SessionKit
 import HistoryKit
+import MediaKit
 
 public struct SettingsView: View {
     @Bindable public var viewModel: SettingsViewModel
@@ -89,6 +90,8 @@ public struct SettingsView: View {
                 Section("Routine") {
                     Button("Replace routine", role: .destructive, action: onReplaceRoutine)
                 }
+
+                CreditsSection()
             }
             .scrollContentBackground(.hidden)
             .background(AppColor.surface)
@@ -97,6 +100,22 @@ public struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", action: onDone)
                 }
+            }
+        }
+    }
+}
+
+/// The licence credit for the exercise illustrations (CC BY-SA 4.0 requires it).
+private struct CreditsSection: View {
+    private static let licence = URL(string: "https://creativecommons.org/licenses/by-sa/4.0/")
+
+    var body: some View {
+        Section("Credits") {
+            Text(ArtSource.credit)
+                .font(.footnote)
+                .foregroundStyle(AppColor.inkSecondary)
+            if let licence = Self.licence {
+                Link("Read the CC BY-SA 4.0 licence", destination: licence)
             }
         }
     }

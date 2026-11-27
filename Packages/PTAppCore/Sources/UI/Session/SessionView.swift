@@ -11,6 +11,7 @@ public struct SessionView: View {
     @State private var confirmingEnd = false
     @Environment(\.appAccent) private var accent
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     public init(viewModel: SessionViewModel, onComplete: @escaping (SessionRecord) -> Void,
                 onEnd: @escaping () -> Void = {}) {
@@ -35,6 +36,7 @@ public struct SessionView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     header
                     titleBlock.padding(.top, 26)
+                        .layoutPriority(-1) // the block above the timer gives way first
                     if let prompt = viewModel.ratingPrompt {
                         RatingPromptCard(exerciseName: prompt.exerciseName,
                                          onRate: { viewModel.rate($0) },
@@ -44,6 +46,7 @@ public struct SessionView: View {
                     }
                     Spacer(minLength: AppSpacing.s(2))
                     BigReading(reading: reading)
+                        .layoutPriority(1)
                     controls.padding(.top, AppSpacing.s(3))
                 }
                 .padding(.horizontal, AppSpacing.screenPadding)
@@ -114,6 +117,11 @@ public struct SessionView: View {
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if showsFigure {
+                ExerciseFigure(art: viewModel.currentArt)
+                    .frame(maxWidth: 96, maxHeight: 96, alignment: .leading)
+                    .layoutPriority(-1) // yields to the title within this block
+            }
             if let upNext = viewModel.upNext, viewModel.isTransitioning {
                 SectionLabel("Up next")
                     .padding(.bottom, -6)
@@ -154,6 +162,24 @@ public struct SessionView: View {
                 .accessibilityHint("It's optional, so the day still counts")
             }
         }
+    }
+
+    private var showsFigure: Bool {
+        Self.showsFigure(art: viewModel.currentArt, isResting: viewModel.isResting,
+                         isTransitioning: viewModel.isTransitioning,
+                         dynamicTypeSize: dynamicTypeSize)
+    }
+
+    /// The timer outranks the picture. The figure appears only when a picture can exist
+    /// (no reserved blank for `.none`/`.unmatched`), not during Rest, and not at accessibility
+    /// sizes. `isAccessibilitySize` is deliberately coarse: it also drops the figure on
+    /// large phones with room to spare, which is cheaper and safer than measuring space.
+    /// It also goes while getting ready for the next exercise: the title then names a
+    /// different exercise, and `currentArt` is still the one just finished.
+    static func showsFigure(art: ArtChoice, isResting: Bool, isTransitioning: Bool = false,
+                            dynamicTypeSize: DynamicTypeSize) -> Bool {
+        guard case .library = art else { return false }
+        return !isResting && !isTransitioning && !dynamicTypeSize.isAccessibilitySize
     }
 
     private var metaLine: String {
