@@ -137,6 +137,19 @@ final class OtherWorkoutsTests: XCTestCase {
         XCTAssertEqual(heatmap[0].days, [.otherWorkout, .otherWorkout, .done, .future, .future, .future, .future])
     }
 
+    func test_heatmap_aPartlyDoneDay_staysPartial_whenAWorkoutAlsoCounted() {
+        let today = day(11, hour: 15)  // Wednesday
+        let started = SessionRecord(routineID: UUID(), startedAt: day(10))  // never finished
+        let workoutDays: Set<Date> = [day(9, hour: 0), day(10, hour: 0)]
+
+        let heatmap = ProgressStats.heatmap(in: [started], weeks: 1, today: today, otherWorkoutDays: workoutDays,
+                                            countedDays: workoutDays, calendar: calendar)
+
+        XCTAssertEqual(heatmap[0].days, [.otherWorkout, .partial, .rest, .future, .future, .future, .future],
+                       "the PT done that day still shows; the workout has its own mark")
+        XCTAssertEqual(heatmap[0].others, [true, true, false, false, false, false, false])
+    }
+
     func test_weekStrip_marksPartialDays_andCountedWorkouts() {
         let today = day(11, hour: 15)
         let sessions = [SessionRecord(routineID: UUID(), startedAt: day(9))]   // started, not finished

@@ -43,9 +43,10 @@ public enum ProgressRange: String, CaseIterable, Identifiable, Sendable {
 public enum DayState: Equatable, Sendable {
     /// A completed session.
     case done
-    /// A session was started or logged but not every exercise was done.
+    /// A session was started or logged but not every exercise was done. Shown even when
+    /// another workout counted that day, since the workout has its own mark.
     case partial
-    /// No completed session, but another workout that counts toward the goal.
+    /// No session at all, but another workout that counts toward the goal.
     case otherWorkout
     case rest
     /// Later this week.
@@ -160,8 +161,8 @@ public extension ProgressStats {
             let days = dates.map { day -> DayState in
                 if day > todayStart { return .future }
                 if done.contains(day) { return .done }
-                if countedDays.contains(day) { return .otherWorkout }
                 if tried.contains(day) { return .partial }
+                if countedDays.contains(day) { return .otherWorkout }
                 return .rest
             }
             return HeatmapWeek(weekStart: start, days: days, others: dates.map { otherWorkoutDays.contains($0) })
