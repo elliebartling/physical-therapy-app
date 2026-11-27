@@ -166,6 +166,13 @@ public enum OtherWorkoutStats {
         Set(workouts.map { calendar.startOfDay(for: $0.start) })
     }
 
+    /// The kind of the longest workout on each day, keyed by start of day.
+    public static func mainActivities(of workouts: [OtherWorkout],
+                                      calendar: Calendar = .current) -> [Date: WorkoutActivity] {
+        Dictionary(grouping: workouts) { calendar.startOfDay(for: $0.start) }
+            .compactMapValues { day in day.max { $0.minutes < $1.minutes }?.activity }
+    }
+
     /// The shortest workout that counts toward the weekly goal and streak.
     public static let countingMinutes = 10
 

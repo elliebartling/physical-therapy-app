@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import HealthKit
 import DataKit
 import HistoryKit
 
@@ -101,11 +102,12 @@ struct RatingLegend: View {
 }
 
 /// One day on the heatmap. The fill says how much PT was done: all of it (solid), some
-/// (the bottom half) or none (grey). A dot, on any fill, marks a workout from outside Mend.
-/// Shape carries the difference as well as color, so it reads in grayscale too.
+/// (the bottom half) or none (grey). A small icon of its kind, on any fill, marks a workout
+/// from outside Mend. Shape carries the difference as well as color, so it reads in
+/// grayscale too.
 struct HeatmapCell: View {
     let state: DayState
-    var hasOther = false
+    var workout: WorkoutActivity?
     @Environment(\.appAccent) private var accent
 
     var body: some View {
@@ -129,10 +131,13 @@ struct HeatmapCell: View {
                 }
             }
             .overlay {
-                if hasOther {
-                    Circle()
-                        .fill(state == .done ? AppColor.onAccent : AppColor.ink)
-                        .scaleEffect(0.34)
+                if let workout {
+                    Image(systemName: workout.symbolName)
+                        .resizable()
+                        .scaledToFit()
+                        .fontWeight(.semibold)
+                        .foregroundStyle(state == .done ? AppColor.onAccent : AppColor.ink.opacity(0.7))
+                        .padding(4)
                 }
             }
     }
@@ -155,13 +160,16 @@ struct HeatmapLegend: View {
         item("PT done", HeatmapCell(state: .done))
         item("Part done", HeatmapCell(state: .partial))
         if showsWorkouts {
-            item("Other workout", HeatmapCell(state: .rest, hasOther: true))
+            item("Other workout", HeatmapCell(state: .rest, workout: Self.sampleWorkout))
         }
     }
 
+    private static let sampleWorkout = WorkoutActivity(id: HKWorkoutActivityType.running.rawValue,
+                                                       name: "Running", tag: "RUN")
+
     private func item(_ title: String, _ cell: HeatmapCell) -> some View {
         HStack(spacing: 6) {
-            cell.frame(width: 14, height: 14)
+            cell.frame(width: 18, height: 18)
             Text(title.uppercased())
                 .font(AppFont.mono(10))
                 .tracking(0.5)
@@ -187,7 +195,7 @@ struct ConsistencyHeatmap: View {
                             .frame(minWidth: 12, alignment: .leading)
                         ForEach(weeks) { week in
                             cell(week.days.indices.contains(weekday) ? week.days[weekday] : .rest,
-                                 hasOther: week.others.indices.contains(weekday) && week.others[weekday])
+                                 workout: week.workouts.indices.contains(weekday) ? week.workouts[weekday] : nil)
                         }
                     }
                 }
@@ -208,8 +216,8 @@ struct ConsistencyHeatmap: View {
         .accessibilityLabel(summary)
     }
 
-    private func cell(_ state: DayState, hasOther: Bool) -> some View {
-        HeatmapCell(state: state, hasOther: hasOther)
+    private func cell(_ state: DayState, workout: WorkoutActivity?) -> some View {
+        HeatmapCell(state: state, workout: workout)
             .frame(maxWidth: 28)
     }
 
