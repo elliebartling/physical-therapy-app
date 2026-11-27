@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import DataKit
 import HistoryKit
+import LiveSession
 import SessionKit
 
 @MainActor
@@ -34,6 +35,9 @@ public final class SessionViewModel {
     private let countdownHaptics: Bool
     private let speech: SpeechService?
     private let announcesNext: Bool
+    /// The workout session and Live Activity that keep the session going outside the app.
+    private let companion: LiveSessionCompanion?
+    private let accentHex: UInt32
     /// Exercises already done or covered today, left out of this session.
     private let alreadyDone: Set<UUID>
 
@@ -81,8 +85,12 @@ public final class SessionViewModel {
                 countdownHaptics: Bool = SessionPreferences.countdownHaptics(),
                 transition: SessionTransition = .none,
                 speech: SpeechService? = nil,
-                announcesNext: Bool = SessionPreferences.announcesNext()) {
+                announcesNext: Bool = SessionPreferences.announcesNext(),
+                companion: LiveSessionCompanion? = nil,
+                accentHex: UInt32 = AccentChoice.signal.hex) {
         self.routine = routine
+        self.companion = companion
+        self.accentHex = accentHex
         self.speech = speech
         self.announcesNext = announcesNext
         self.alreadyDone = skipping
@@ -145,10 +153,15 @@ public final class SessionViewModel {
             for await event in engine.events { self.handle(event) }
         }
         defer { listener.cancel() }
+        await companion?.begin(routineName: routine.name, accentHex: accentHex, state: liveState) { [weak self] command in
+            self?.handle(command)
+        }
         do {
             try await engine.start()
         } catch {
-            return // cancelled: the view went away mid-session
+            // Cancelled: the view went away mid-session. Don't leave the Live Activity behind.
+            if let companion { Task { await companion.finish(at: .now, saveWorkout: false) } }
+            return
         }
         // Ending early or an expired resume window already saved this session as partial.
         guard !isComplete else { return }
@@ -222,6 +235,8 @@ public final class SessionViewModel {
     }
 
     public func appWillResignActive() {
+        // A running workout session keeps the timer going while away.
+        if companion?.runsInBackground == true { return }
         backgroundedAt = .now
         engine.pause()
     }
@@ -245,12 +260,87 @@ public final class SessionViewModel {
     /// its own: the view, and with it `run()`, goes away once the session is
     /// complete, and the record mustn't be touched after its context is gone.
     private func saveToHealth(endedAt: Date, finished: Bool) {
-        guard let health, finished || !sessionRecord.exerciseRecords.isEmpty else { return }
+        let didWork = finished || !sessionRecord.exerciseRecords.isEmpty
         let start = sessionRecord.startedAt
-        healthSave = Task { await health.record(start: start, end: endedAt, wasLoggedLater: false) }
+        let health = self.health
+        let companion = self.companion
+        // A running workout session becomes the Health workout, when saving is on.
+        let keepWorkout = didWork && HealthPreferences.load().isEnabled
+        guard companion != nil || (health != nil && didWork) else { return }
+        healthSave = Task {
+            if let companion, await companion.finish(at: endedAt, saveWorkout: keepWorkout) { return }
+            guard didWork, let health else { return }
+            await health.record(start: start, end: endedAt, wasLoggedLater: false)
+        }
+    }
+
+    // MARK: Outside the app
+
+    /// Pause and Next from the Live Activity.
+    private func handle(_ command: LiveSessionCommands.Command) {
+        switch command {
+        case .togglePause:
+            isPaused ? resume() : pause()
+        case .next:
+            switch display {
+            case .reps, .transition(nil): Task { await completeCurrentSet() }
+            default: Task { await skipCurrentSet() }
+            }
+        }
+    }
+
+    /// The session as the Live Activity shows it.
+    var liveState: SessionActivityAttributes.ContentState {
+        Self.liveState(display: display, isPaused: isPaused, startedAt: displayStartedAt, pausedAt: pausedAt,
+                       title: liveTitle, detail: liveDetail,
+                       progress: totalExercises > 0 ? Double(exerciseIndex) / Double(totalExercises) : 0)
+    }
+
+    static func liveState(display: Display, isPaused: Bool, startedAt: Date, pausedAt: Date?,
+                          title: String, detail: String, progress: Double) -> SessionActivityAttributes.ContentState {
+        let seconds: Int? = switch display {
+        case .hold(let seconds), .rest(let seconds): seconds
+        case .transition(let seconds): seconds
+        case .reps, .starting: nil
+        }
+        var endsAt: Date?
+        var remaining: Int?
+        if let seconds {
+            if isPaused, let pausedAt {
+                remaining = max(0, Int((Double(seconds) - pausedAt.timeIntervalSince(startedAt)).rounded(.up)))
+            } else {
+                endsAt = startedAt.addingTimeInterval(Double(seconds))
+            }
+        }
+        var reps: Int?
+        if case .reps(let count) = display { reps = count }
+        return SessionActivityAttributes.ContentState(title: title, detail: detail, endsAt: endsAt,
+                                                      remainingSeconds: remaining, reps: reps,
+                                                      isPaused: isPaused, progress: progress)
+    }
+
+    private var liveTitle: String {
+        if isTransitioning, let upNext { return "Up next: \(upNext.name)" }
+        if isResting { return "Rest" }
+        if display == .starting { return routine.name }
+        return currentExerciseName
+    }
+
+    private var liveDetail: String {
+        if isTransitioning, let upNext { return upNext.prescription + (upNext.isOptional ? " — OPTIONAL" : "") }
+        if isResting { return "NEXT — SET \(currentSet + 1)/\(totalSets)" }
+        if display == .starting { return "STARTING" }
+        var parts = ["SET \(currentSet)/\(totalSets)"]
+        switch currentSide {
+        case .left: parts.append("LEFT SIDE")
+        case .right: parts.append("RIGHT SIDE")
+        case .both, .alternating: break
+        }
+        return parts.joined(separator: " — ")
     }
 
     private func handle(_ event: PhaseEvent) {
+        defer { companion?.update(liveState) }
         switch event {
         case .sessionStarted: break
         case .exerciseStarted(let id, let index, let total):

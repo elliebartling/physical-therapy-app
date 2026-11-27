@@ -5,6 +5,7 @@ public enum SessionPreferences {
     public static let countdownHapticsKey = "countdownHaptics"
     public static let transitionSecondsKey = "transitionSeconds"
     public static let announceNextKey = "announceNext"
+    public static let backgroundKey = "keepsRunningInBackground"
     /// Ten seconds to get into position, unless changed.
     public static let defaultTransitionSeconds = 10
 
@@ -21,5 +22,11 @@ public enum SessionPreferences {
     /// Say what's next aloud. On unless turned off.
     public static func announcesNext(in defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: announceNextKey) as? Bool ?? true
+    }
+
+    /// Run sessions as a Health workout so the timer carries on in the background.
+    /// On unless turned off.
+    public static func keepsRunningInBackground(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: backgroundKey) as? Bool ?? true
     }
 }

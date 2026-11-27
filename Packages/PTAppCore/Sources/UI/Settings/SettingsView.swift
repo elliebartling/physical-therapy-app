@@ -14,6 +14,7 @@ public struct SettingsView: View {
     @AppStorage(SessionPreferences.countdownHapticsKey) private var countdownHaptics = true
     @AppStorage(SessionPreferences.transitionSecondsKey) private var transitionSeconds = SessionPreferences.defaultTransitionSeconds
     @AppStorage(SessionPreferences.announceNextKey) private var announceNext = true
+    @AppStorage(SessionPreferences.backgroundKey) private var keepsRunningInBackground = true
 
     private var accent: AccentChoice { AccentChoice(rawValue: accentRaw) ?? .signal }
 
@@ -71,10 +72,11 @@ public struct SettingsView: View {
                     }
                     Toggle("Say what's next", isOn: $announceNext)
                     Toggle("Countdown haptics", isOn: $countdownHaptics)
+                    Toggle("Keep going in the background", isOn: $keepsRunningInBackground)
                 } header: {
                     Text("Session")
                 } footer: {
-                    Text("A pause to get into position, with what's next on screen and read aloud. A routine can set its own pause when you edit it. Countdown haptics tap on each of the last three seconds of a hold, rest or pause.")
+                    Text("A pause to get into position, with what's next on screen and read aloud. A routine can set its own pause when you edit it. Countdown haptics tap on each of the last three seconds of a hold, rest or pause. Keep going in the background runs each session as an Apple Health workout, so the timer carries on when you switch apps, with a Live Activity on the Lock Screen; the workout is only kept in Health if you save sessions there.")
                 }
 
                 HealthSettingsSection(viewModel: viewModel)
