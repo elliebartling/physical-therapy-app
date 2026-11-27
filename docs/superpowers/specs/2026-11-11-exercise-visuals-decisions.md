@@ -79,6 +79,15 @@ blank square.
 **`ArtStore.prefetch` was deleted.** No production caller; reintroduce it
 deliberately when something needs it.
 
+**The session figure goes while getting ready for the next exercise.** Main's
+transition state (#29) puts "Up next" and the *next* exercise's name in the title
+block, but `currentArt` is still the exercise just finished — so the picture would
+have contradicted the words beside it. `showsFigure` now also refuses while
+transitioning. The better answer is the next exercise's own picture, which needs
+`SessionViewModel.UpNext` to carry art; left as a follow-up rather than widened
+into a merge resolution. *Cost if wrong:* a few seconds with no picture during a
+transition, where before there was a wrong one.
+
 ## Known-wrong and deferred
 
 **Matching runs once per exercise, not once per routine.** The spec originally
