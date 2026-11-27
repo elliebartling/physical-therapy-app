@@ -10,6 +10,8 @@ public enum PhaseEvent: Equatable, Sendable {
     case exerciseCompleted(exerciseID: UUID)
     /// The rest of an exercise was skipped, e.g. an optional one.
     case exerciseSkipped(exerciseID: UUID)
+    /// A pause before the next exercise: `seconds` to get ready, or nil to wait for a tap.
+    case transition(nextExerciseID: UUID, seconds: Int?)
     case sessionCompleted
     case paused
     case resumed

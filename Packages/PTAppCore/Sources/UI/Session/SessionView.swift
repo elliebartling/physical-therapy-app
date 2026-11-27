@@ -114,22 +114,32 @@ public struct SessionView: View {
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(viewModel.isResting ? "Rest" : viewModel.currentExerciseName)
-                .font(AppFont.display(56, weight: .bold))
-                .tracking(-2.6)
-                .lineLimit(2)
-                .minimumScaleFactor(0.6)
+            if let upNext = viewModel.upNext, viewModel.isTransitioning {
+                SectionLabel("Up next")
+                    .padding(.bottom, -6)
+                Text(upNext.name)
+                    .font(AppFont.display(56, weight: .bold))
+                    .tracking(-2.6)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+            } else {
+                Text(viewModel.isResting ? "Rest" : viewModel.currentExerciseName)
+                    .font(AppFont.display(56, weight: .bold))
+                    .tracking(-2.6)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+            }
             Text(metaLine)
                 .font(AppFont.mono(12, weight: .medium))
                 .tracking(0.7)
                 .foregroundStyle(AppColor.inkSecondary)
-            if !viewModel.isResting, !viewModel.currentNotes.isEmpty {
+            if !viewModel.isResting, !viewModel.isTransitioning, !viewModel.currentNotes.isEmpty {
                 Text(viewModel.currentNotes)
                     .font(AppFont.body(15))
                     .foregroundStyle(AppColor.inkSecondary)
                     .lineLimit(3)
             }
-            if viewModel.currentIsOptional, !viewModel.isResting {
+            if viewModel.currentIsOptional, !viewModel.isResting, !viewModel.isTransitioning {
                 Button {
                     Task { await viewModel.skipCurrentExercise() }
                 } label: {
@@ -147,6 +157,12 @@ public struct SessionView: View {
     }
 
     private var metaLine: String {
+        if let upNext = viewModel.upNext, viewModel.isTransitioning {
+            var parts = [upNext.prescription.uppercased()]
+            if upNext.isOptional { parts.append("OPTIONAL") }
+            if viewModel.isPaused { parts.append("PAUSED") }
+            return parts.joined(separator: " — ")
+        }
         if viewModel.isResting {
             return "NEXT — SET \(viewModel.currentSet + 1)/\(viewModel.totalSets)"
         }
@@ -179,7 +195,14 @@ public struct SessionView: View {
 
     @ViewBuilder
     private var primaryButton: some View {
-        if case .reps = viewModel.display, !viewModel.isPaused {
+        if case .transition(nil) = viewModel.display, !viewModel.isPaused {
+            Button {
+                Task { await viewModel.startNext() }
+            } label: {
+                primaryLabel("Start", systemImage: "play.fill")
+            }
+            .buttonStyle(InkGlassButtonStyle())
+        } else if case .reps = viewModel.display, !viewModel.isPaused {
             Button {
                 Task { await viewModel.completeCurrentSet() }
             } label: {
@@ -229,7 +252,12 @@ struct TimerReading: Equatable {
             total = count
             remaining = count
             fraction = 0
-        case .starting:
+        case .transition(let seconds?):
+            let left = max(0, Double(seconds) - now.timeIntervalSince(startedAt))
+            total = seconds
+            remaining = Int(left.rounded(.up))
+            fraction = seconds > 0 ? left / Double(seconds) : 0
+        case .transition(nil), .starting:
             total = 0
             remaining = 0
             fraction = 0
@@ -279,7 +307,7 @@ private struct BigReading: View {
             .font(AppFont.mono(12, weight: .medium))
             .tracking(0.7)
         }
-        .opacity(reading.display == .starting ? 0 : 1)
+        .opacity(reading.display == .starting || reading.display == .transition(seconds: nil) ? 0 : 1)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
@@ -292,6 +320,7 @@ private struct BigReading: View {
     private var suffix: String? {
         switch reading.display {
         case .hold, .rest: return "OF \(reading.total)"
+        case .transition: return "GET READY"
         case .reps, .starting: return nil
         }
     }
@@ -300,6 +329,8 @@ private struct BigReading: View {
         switch reading.display {
         case .hold: return "\(reading.remaining) of \(reading.total) seconds left"
         case .rest: return "Rest, \(reading.remaining) seconds left"
+        case .transition(let seconds?): return "Next exercise in \(min(reading.remaining, seconds)) seconds"
+        case .transition(nil): return ""
         case .reps(let count): return "\(count) reps"
         case .starting: return ""
         }

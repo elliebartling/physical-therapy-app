@@ -12,6 +12,9 @@ public final class Routine {
     public var phaseStorage: Int?
     /// The routine this one replaced, when it came from a new sheet.
     public var previousVersionID: UUID?
+    /// The pause between exercises for this routine; nil uses the app's setting.
+    /// Read it through `transitionSeconds`.
+    public var transitionStorage: Int? = nil
 
     public init(
         id: UUID = UUID(),
@@ -34,4 +37,11 @@ public final class Routine {
     }
 
     public var orderedExercises: [Exercise] { exercises.sorted { $0.order < $1.order } }
+
+    /// Seconds between exercises: nil follows the app's setting, 0 waits for a tap,
+    /// and a negative number goes straight on.
+    public var transitionSeconds: Int? {
+        get { transitionStorage }
+        set { transitionStorage = newValue }
+    }
 }

@@ -7,6 +7,8 @@ public final class SessionEngine {
     private let clock: Clock
     /// Exercises left out, e.g. ones another workout already covered today.
     private let skipping: Set<UUID>
+    /// What happens between exercises.
+    private let transition: SessionTransition
     private var exercises: [Exercise] {
         routine.exercises.filter { !skipping.contains($0.id) }.sorted { $0.order < $1.order }
     }
@@ -30,10 +32,12 @@ public final class SessionEngine {
     /// Set by `skipCurrentExercise()`; the rest of the current exercise is left out.
     private var skippingExercise = false
 
-    public init(routine: Routine, clock: Clock = SystemClock(), skipping: Set<UUID> = []) {
+    public init(routine: Routine, clock: Clock = SystemClock(), skipping: Set<UUID> = [],
+                transition: SessionTransition = .none) {
         self.routine = routine
         self.clock = clock
         self.skipping = skipping
+        self.transition = transition
         var cont: AsyncStream<PhaseEvent>.Continuation!
         self.events = AsyncStream { cont = $0 }
         self.continuation = cont
@@ -50,6 +54,9 @@ public final class SessionEngine {
             try await runExercise(exercise)
             continuation.yield(skippingExercise ? .exerciseSkipped(exerciseID: exercise.id)
                                                 : .exerciseCompleted(exerciseID: exercise.id))
+            if exercises.indices.contains(idx + 1) {
+                try await runTransition(to: exercises[idx + 1])
+            }
         }
         continuation.yield(.sessionCompleted)
         continuation.finish()
@@ -80,6 +87,24 @@ public final class SessionEngine {
         setCompletion = nil
         if isTiming, isPaused { skipWhilePaused = true }
         skipCurrentWait?.yield()
+    }
+
+    /// The pause before `next`: a countdown, or a wait for `completeCurrentSet()`. Skippable.
+    private func runTransition(to next: Exercise) async throws {
+        await Task.yield()
+        await awaitIfPaused()
+        switch transition {
+        case .none:
+            return
+        case .timed(let seconds):
+            continuation.yield(.transition(nextExerciseID: next.id, seconds: seconds))
+            try await timedWait(seconds: Double(seconds))
+        case .manual:
+            continuation.yield(.transition(nextExerciseID: next.id, seconds: nil))
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                setCompletion = cont
+            }
+        }
     }
 
     /// Leaves out the rest of the current exercise, e.g. an optional one, and moves on.
