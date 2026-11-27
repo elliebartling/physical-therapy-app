@@ -108,44 +108,15 @@ public struct ProgressScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             ProgressSectionHeader(title: "01 — Consistency", trailing: "\(viewModel.heatmap.count) weeks")
             ConsistencyHeatmap(weeks: viewModel.heatmap)
-            HStack(spacing: 14) {
-                legendSwatch("Done", opacity: 1)
-                if viewModel.countsOtherWorkouts && !viewModel.otherWorkouts.isEmpty {
-                    legendSwatch("Workout", opacity: 0.65)
-                }
-                legendSwatch("Partial", opacity: 0.35)
-                if !viewModel.otherWorkouts.isEmpty && !viewModel.countsOtherWorkouts {
-                    HStack(spacing: 6) {
-                        Circle().fill(AppColor.ink).frame(width: 6, height: 6)
-                        Text("OTHER WORKOUT")
-                            .font(AppFont.mono(10))
-                            .tracking(0.5)
-                            .foregroundStyle(AppColor.inkSecondary)
-                    }
-                    .accessibilityHidden(true)
-                }
-                Spacer()
-                if viewModel.longestStreak > 1 {
-                    Text("LONGEST STREAK \(viewModel.longestStreak) DAYS")
-                        .font(AppFont.mono(10, weight: .medium))
-                        .tracking(0.5)
-                }
+            HeatmapLegend(showsWorkouts: !viewModel.otherWorkouts.isEmpty)
+                .padding(.top, 12)
+            if viewModel.longestStreak > 1 {
+                Text("LONGEST STREAK \(viewModel.longestStreak) DAYS")
+                    .font(AppFont.mono(10, weight: .medium))
+                    .tracking(0.5)
+                    .padding(.top, 8)
             }
-            .padding(.top, 12)
         }
-    }
-
-    private func legendSwatch(_ title: String, opacity: Double) -> some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(AccentFill(opacity: opacity))
-                .frame(width: 10, height: 10)
-            Text(title.uppercased())
-                .font(AppFont.mono(10))
-                .tracking(0.5)
-                .foregroundStyle(AppColor.inkSecondary)
-        }
-        .accessibilityHidden(true)
     }
 
     private var pain: some View {
@@ -157,8 +128,8 @@ public struct ProgressScreen: View {
                 PainChart(points: viewModel.painPoints, workouts: viewModel.otherWorkouts)
                 if !viewModel.otherWorkouts.isEmpty {
                     HStack(spacing: 6) {
-                        Rectangle().fill(AccentFill(opacity: 1)).frame(width: 10, height: 6)
-                        Text("OTHER WORKOUTS")
+                        Circle().fill(AppColor.ink.opacity(0.55)).frame(width: 5, height: 5)
+                        Text("DAYS WITH ANOTHER WORKOUT")
                             .font(AppFont.mono(10))
                             .tracking(0.5)
                             .foregroundStyle(AppColor.inkSecondary)
@@ -281,15 +252,6 @@ public struct ProgressScreen: View {
                 .font(AppFont.body(15))
                 .foregroundStyle(AppColor.inkSecondary)
         }
-    }
-}
-
-/// The accent at some strength, as a fill.
-private struct AccentFill: ShapeStyle {
-    let opacity: Double
-
-    func resolve(in environment: EnvironmentValues) -> Color {
-        environment.appAccent.opacity(opacity)
     }
 }
 

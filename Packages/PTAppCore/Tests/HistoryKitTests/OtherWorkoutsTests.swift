@@ -104,9 +104,11 @@ final class OtherWorkoutsTests: XCTestCase {
                         workout(running, on: day(4, hour: 7))]
 
         let heatmap = ProgressStats.heatmap(in: [], weeks: 2, today: today,
-                                            otherWorkoutDays: OtherWorkoutStats.days(of: workouts, calendar: calendar),
+                                            otherWorkouts: OtherWorkoutStats.mainActivities(of: workouts,
+                                                                                            calendar: calendar),
                                             calendar: calendar)
-        XCTAssertEqual(heatmap[0].others, [false, false, true, false, false, false, false])
+        XCTAssertEqual(heatmap[0].workouts, [nil, nil, running, nil, nil, nil, nil])
+        XCTAssertEqual(heatmap[1].workouts, [yoga, nil, nil, nil, nil, nil, nil], "the longest workout that day")
         XCTAssertEqual(heatmap[1].others, [true, false, false, false, false, false, false])
 
         let week = WeekStrip.forWeek(containing: today, sessions: [], otherWorkouts: workouts, calendar: calendar)
@@ -135,6 +137,20 @@ final class OtherWorkoutsTests: XCTestCase {
 
         let heatmap = ProgressStats.heatmap(in: [session], weeks: 1, today: today, countedDays: extra, calendar: calendar)
         XCTAssertEqual(heatmap[0].days, [.otherWorkout, .otherWorkout, .done, .future, .future, .future, .future])
+    }
+
+    func test_heatmap_aPartlyDoneDay_staysPartial_whenAWorkoutAlsoCounted() {
+        let today = day(11, hour: 15)  // Wednesday
+        let started = SessionRecord(routineID: UUID(), startedAt: day(10))  // never finished
+        let workoutDays: Set<Date> = [day(9, hour: 0), day(10, hour: 0)]
+        let activities = [day(9, hour: 0): running, day(10, hour: 0): yoga]
+
+        let heatmap = ProgressStats.heatmap(in: [started], weeks: 1, today: today, otherWorkouts: activities,
+                                            countedDays: workoutDays, calendar: calendar)
+
+        XCTAssertEqual(heatmap[0].days, [.otherWorkout, .partial, .rest, .future, .future, .future, .future],
+                       "the PT done that day still shows; the workout has its own mark")
+        XCTAssertEqual(heatmap[0].others, [true, true, false, false, false, false, false])
     }
 
     func test_weekStrip_marksPartialDays_andCountedWorkouts() {

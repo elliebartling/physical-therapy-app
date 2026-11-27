@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import HealthKit
 import DataKit
 import HistoryKit
 
@@ -100,11 +101,88 @@ struct RatingLegend: View {
     }
 }
 
+/// One day on the heatmap. The fill says how much PT was done: all of it (solid), some
+/// (the bottom half) or none (grey). A small icon of its kind, on any fill, marks a workout
+/// from outside Mend. Shape carries the difference as well as color, so it reads in
+/// grayscale too.
+struct HeatmapCell: View {
+    let state: DayState
+    var workout: WorkoutActivity?
+    @Environment(\.appAccent) private var accent
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 2)
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .background {
+                switch state {
+                case .done:
+                    shape.fill(accent)
+                case .partial:
+                    VStack(spacing: 0) {
+                        AppColor.hairline
+                        accent
+                    }
+                    .clipShape(shape)
+                case .otherWorkout, .rest:
+                    shape.fill(AppColor.hairline)
+                case .future:
+                    shape.strokeBorder(AppColor.hairline, lineWidth: 1)
+                }
+            }
+            .overlay {
+                if let workout {
+                    Image(systemName: workout.symbolName)
+                        .resizable()
+                        .scaledToFit()
+                        .fontWeight(.semibold)
+                        .foregroundStyle(state == .done ? AppColor.onAccent : AppColor.ink.opacity(0.7))
+                        .padding(4)
+                }
+            }
+    }
+}
+
+/// What the heatmap's cells mean, drawn with the cells themselves.
+struct HeatmapLegend: View {
+    var showsWorkouts = false
+
+    var body: some View {
+        // One row when it fits; stacked at larger text sizes.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 14) { items }
+            VStack(alignment: .leading, spacing: 6) { items }
+        }
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var items: some View {
+        item("PT done", HeatmapCell(state: .done))
+        item("Part done", HeatmapCell(state: .partial))
+        if showsWorkouts {
+            item("Other workout", HeatmapCell(state: .rest, workout: Self.sampleWorkout))
+        }
+    }
+
+    private static let sampleWorkout = WorkoutActivity(id: HKWorkoutActivityType.running.rawValue,
+                                                       name: "Running", tag: "RUN")
+
+    private func item(_ title: String, _ cell: HeatmapCell) -> some View {
+        HStack(spacing: 6) {
+            cell.frame(width: 18, height: 18)
+            Text(title.uppercased())
+                .font(AppFont.mono(10))
+                .tracking(0.5)
+                .foregroundStyle(AppColor.inkSecondary)
+                .fixedSize()
+        }
+    }
+}
+
 /// Days done and partly done, one column per week, this week last.
 struct ConsistencyHeatmap: View {
     let weeks: [HeatmapWeek]
     var calendar: Calendar = .current
-    @Environment(\.appAccent) private var accent
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -117,7 +195,7 @@ struct ConsistencyHeatmap: View {
                             .frame(minWidth: 12, alignment: .leading)
                         ForEach(weeks) { week in
                             cell(week.days.indices.contains(weekday) ? week.days[weekday] : .rest,
-                                 hasOther: week.others.indices.contains(weekday) && week.others[weekday])
+                                 workout: week.workouts.indices.contains(weekday) ? week.workouts[weekday] : nil)
                         }
                     }
                 }
@@ -138,34 +216,9 @@ struct ConsistencyHeatmap: View {
         .accessibilityLabel(summary)
     }
 
-    private func cell(_ state: DayState, hasOther: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 2)
-            .fill(fill(state))
-            .overlay {
-                if state == .future {
-                    RoundedRectangle(cornerRadius: 2).strokeBorder(AppColor.hairline, lineWidth: 1)
-                }
-            }
-            .overlay {
-                // A workout from outside Mend: a dot, dark on an accent-filled day so it shows.
-                if hasOther {
-                    Circle()
-                        .fill(state == .done || state == .otherWorkout ? AppColor.onAccent : AppColor.ink)
-                        .padding(5)
-                }
-            }
-            .aspectRatio(1, contentMode: .fit)
+    private func cell(_ state: DayState, workout: WorkoutActivity?) -> some View {
+        HeatmapCell(state: state, workout: workout)
             .frame(maxWidth: 28)
-    }
-
-    private func fill(_ state: DayState) -> Color {
-        switch state {
-        case .done: accent
-        case .partial: accent.opacity(0.35)
-        case .otherWorkout: accent.opacity(0.65)
-        case .rest: AppColor.hairline
-        case .future: .clear
-        }
     }
 
     /// Single-letter weekday names, starting on the calendar's first weekday.
@@ -193,17 +246,15 @@ struct ConsistencyHeatmap: View {
 struct PainChart: View {
     let points: [PainPoint]
     var workouts: [OtherWorkout] = []
-    @Environment(\.appAccent) private var accent
 
     var body: some View {
         Chart {
-            ForEach(workouts) { workout in
-                RectangleMark(
-                    x: .value("Day", workout.start, unit: .day),
-                    yStart: .value("Workout", -2.4),
-                    yEnd: .value("Workout", -0.9)
-                )
-                .foregroundStyle(accent)
+            // The same dot as the heatmap: one per day with a workout from outside Mend.
+            ForEach(workoutDays, id: \.self) { day in
+                PointMark(x: .value("Day", day), y: .value("Workout", -1.6))
+                    .symbol(.circle)
+                    .symbolSize(14)
+                    .foregroundStyle(AppColor.ink.opacity(0.55))
             }
             ForEach(points) { point in
                 LineMark(x: .value("Date", point.date), y: .value("Pain", Double(point.level)))
@@ -240,8 +291,15 @@ struct PainChart: View {
         let levels = points.map(\.level)
         var text = "Pain after sessions, \(points.count) readings. First \(first.level), latest \(last.level), "
             + "lowest \(levels.min() ?? 0), highest \(levels.max() ?? 0), out of 10."
-        if !workouts.isEmpty { text += " \(workouts.count) other workouts marked below." }
+        if !workouts.isEmpty { text += " \(workoutDays.count) days with another workout marked below." }
         return text
+    }
+
+    /// Midday of each day with a workout, oldest first.
+    private var workoutDays: [Date] {
+        let calendar = Calendar.current
+        let days = Set(workouts.map { calendar.startOfDay(for: $0.start) })
+        return days.sorted().compactMap { calendar.date(byAdding: .hour, value: 12, to: $0) }
     }
 }
 

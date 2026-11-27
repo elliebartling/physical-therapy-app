@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 import SwiftData
 import DataKit
 import HistoryKit
@@ -334,6 +335,16 @@ final class OtherWorkoutsUITests: XCTestCase {
         let tuesday = try XCTUnwrap(vm.week.days.first { calendar.isDate($0.date, inSameDayAs: day(10)) })
         XCTAssertTrue(tuesday.isPartial)
         XCTAssertFalse(tuesday.isActive)
+    }
+
+    /// The heatmap draws each day's workout with its kind's symbol; a misspelt name draws nothing.
+    func test_everyWorkoutKind_hasASymbolThatExists() {
+        for activity in WorkoutActivity.catalog {
+            XCTAssertNotNil(UIImage(systemName: activity.symbolName), "\(activity.name): \(activity.symbolName)")
+        }
+        let symbols = WorkoutActivity.catalog.map(\.symbolName)
+        XCTAssertFalse(symbols.contains("figure.mixed.cardio"), "only kinds off the list use the fallback")
+        XCTAssertNotNil(UIImage(systemName: WorkoutActivity(id: 9_999, name: "Workout", tag: "OTHER").symbolName))
     }
 
     func test_progress_countsOtherWorkoutDaysTowardTheGoal_andSaysSoForYourPT() async throws {
