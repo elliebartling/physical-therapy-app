@@ -3,6 +3,7 @@ import SwiftData
 import DataKit
 import HistoryKit
 import UI
+import SessionKit
 
 struct RootView: View {
     enum Route: Hashable { case home, setup, editRoutine, session, complete, settings }
@@ -49,7 +50,10 @@ struct RootView: View {
                         viewModel: SessionViewModel(
                             routine: routine, sessionRepo: sessionRepo,
                             // Carries on from what's already done or covered today.
-                            skipping: DayProgress.skipping(on: .now, in: (try? sessionRepo.fetchAll()) ?? [])
+                            skipping: DayProgress.skipping(on: .now, in: (try? sessionRepo.fetchAll()) ?? []),
+                            transition: SessionTransition.resolve(routineSeconds: routine.transitionSeconds,
+                                                                  appSeconds: SessionPreferences.transitionSeconds()),
+                            speech: SpeechService()
                         ),
                         onComplete: { record in
                             finishedSession = record

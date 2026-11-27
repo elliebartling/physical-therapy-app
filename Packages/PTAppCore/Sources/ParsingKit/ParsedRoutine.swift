@@ -47,10 +47,13 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
 
     public var name: String
     public var exercises: [ParsedExercise]
+    /// The pause between exercises; nil follows the app's setting. See `Routine.transitionSeconds`.
+    public var transitionSeconds: Int?
 
-    public init(name: String, exercises: [ParsedExercise]) {
+    public init(name: String, exercises: [ParsedExercise], transitionSeconds: Int? = nil) {
         self.name = name
         self.exercises = exercises
+        self.transitionSeconds = transitionSeconds
     }
 
     public func toRoutine() -> Routine {
@@ -72,6 +75,8 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
                 isOptional: p.isOptional
             )
         }
-        return Routine(name: name, exercises: mapped)
+        let routine = Routine(name: name, exercises: mapped)
+        routine.transitionSeconds = transitionSeconds
+        return routine
     }
 }

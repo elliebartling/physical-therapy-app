@@ -5,7 +5,8 @@ public extension ParsedRoutine {
     /// An editable draft of a saved routine. Exercise ids carry over, so applying
     /// the draft later updates those exercises instead of replacing them.
     init(routine: Routine) {
-        self.init(name: routine.name, exercises: routine.orderedExercises.map(ParsedExercise.init(exercise:)))
+        self.init(name: routine.name, exercises: routine.orderedExercises.map(ParsedExercise.init(exercise:)),
+                  transitionSeconds: routine.transitionSeconds)
     }
 
     /// Writes this draft onto `routine` in place. Exercises whose ids survive keep their
@@ -14,6 +15,7 @@ public extension ParsedRoutine {
     @discardableResult
     func apply(to routine: Routine) -> [Exercise] {
         routine.name = name
+        routine.transitionSeconds = transitionSeconds
         let existing = Dictionary(routine.exercises.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let kept: [Exercise] = exercises.enumerated().map { index, draft in
             if let exercise = existing[draft.id] {

@@ -53,6 +53,7 @@ public final class RoutineRepository {
                 if currentExercises[oldIndex].isOptional { newExercises[newIndex].isOptional = true }
             }
             routine.phase = current.phase + 1
+            if routine.transitionSeconds == nil { routine.transitionSeconds = current.transitionSeconds }
             routine.previousVersionID = current.id
         }
         for old in try fetchAll() where old.isActive {

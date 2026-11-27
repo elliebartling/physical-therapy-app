@@ -1,5 +1,6 @@
 import SwiftUI
 import ParsingKit
+import SessionKit
 
 public struct RoutineEditorView: View {
     @Bindable public var viewModel: RoutineEditorViewModel
@@ -39,6 +40,17 @@ public struct RoutineEditorView: View {
                     } label: {
                         Label("Add exercise", systemImage: "plus")
                     }
+                }
+                Section {
+                    Picker("Between exercises", selection: $viewModel.transitionSeconds) {
+                        Text("App setting (\(SessionTransition.title(for: SessionPreferences.transitionSeconds())))")
+                            .tag(Int?.none)
+                        ForEach(SessionTransition.choices, id: \.self) { seconds in
+                            Text(SessionTransition.title(for: seconds)).tag(Int?(seconds))
+                        }
+                    }
+                } footer: {
+                    Text("A pause to get into position, with what's next on screen.")
                 }
             }
             .navigationTitle(title ?? "")
