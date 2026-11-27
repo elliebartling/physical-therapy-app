@@ -50,8 +50,9 @@ targets:
           - UIInterfaceOrientationPortrait
         # A guided session runs as a Health workout session so its timer, cues and
         # voice carry on in the background, with a Live Activity on the Lock Screen.
+        # `workout-processing` is watchOS-only (App Store Connect rejects it on
+        # iOS); on iPhone the workout session itself keeps the app running.
         UIBackgroundModes:
-          - workout-processing
           - audio
         NSSupportsLiveActivities: true
         UIAppFonts:
