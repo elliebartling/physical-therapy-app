@@ -27,6 +27,8 @@ public final class SessionEngine {
     /// A skip pressed while a timed hold or rest is paused; it ends that wait on resume.
     private var skipWhilePaused = false
     private var isTiming = false
+    /// Set by `skipCurrentExercise()`; the rest of the current exercise is left out.
+    private var skippingExercise = false
 
     public init(routine: Routine, clock: Clock = SystemClock(), skipping: Set<UUID> = []) {
         self.routine = routine
@@ -44,8 +46,10 @@ public final class SessionEngine {
             continuation.yield(.exerciseStarted(
                 exerciseID: exercise.id, index: idx, totalExercises: exercises.count
             ))
+            skippingExercise = false
             try await runExercise(exercise)
-            continuation.yield(.exerciseCompleted(exerciseID: exercise.id))
+            continuation.yield(skippingExercise ? .exerciseSkipped(exerciseID: exercise.id)
+                                                : .exerciseCompleted(exerciseID: exercise.id))
         }
         continuation.yield(.sessionCompleted)
         continuation.finish()
@@ -76,6 +80,12 @@ public final class SessionEngine {
         setCompletion = nil
         if isTiming, isPaused { skipWhilePaused = true }
         skipCurrentWait?.yield()
+    }
+
+    /// Leaves out the rest of the current exercise, e.g. an optional one, and moves on.
+    public func skipCurrentExercise() async throws {
+        skippingExercise = true
+        try await skipCurrentSet()
     }
 
     private enum WaitOutcome: Sendable { case elapsed, skipped, paused }
@@ -140,6 +150,7 @@ public final class SessionEngine {
             for (sideIndex, side) in sides.enumerated() {
                 await Task.yield()
                 await awaitIfPaused()
+                if skippingExercise { return }
                 continuation.yield(.setStarted(setIndex: setIndex, totalSets: totalSets, side: side))
                 if sideIndex > 0 {
                     continuation.yield(.sideSwitch(to: side))
@@ -157,6 +168,7 @@ public final class SessionEngine {
 
             await Task.yield()
             await awaitIfPaused()
+            if skippingExercise { return }
 
             let isLastSet = setIndex == totalSets - 1
             if !isLastSet, exercise.restSeconds > 0 {

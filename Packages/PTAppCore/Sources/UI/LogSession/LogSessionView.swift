@@ -24,7 +24,8 @@ public struct LogSessionView: View {
                     ForEach(viewModel.items) { item in
                         Toggle(isOn: Binding(get: { item.isDone },
                                              set: { viewModel.setDone($0, for: item.id) })) {
-                            LogExerciseLabel(name: item.name, prescription: item.prescription,
+                            LogExerciseLabel(name: item.name,
+                                             prescription: item.prescription + (item.isOptional ? " — OPTIONAL" : ""),
                                              coveredBy: item.coveredBy)
                         }
                     }
@@ -99,8 +100,8 @@ public struct LogSessionView: View {
 
     private var footer: String {
         if !viewModel.canSave { return "Check at least one exercise to log a session." }
-        if viewModel.isEveryExerciseDone { return "Counts toward your week, just like a guided session." }
-        return "Saved as a partial session. Check every exercise to count it toward your week."
+        if viewModel.isComplete { return "Counts toward your week, just like a guided session." }
+        return "Saved as a partial session. Check every required exercise to count it toward your week."
     }
 }
 

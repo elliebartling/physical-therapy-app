@@ -8,6 +8,8 @@ public enum PhaseEvent: Equatable, Sendable {
     case rest(seconds: Int)
     case sideSwitch(to: Side)
     case exerciseCompleted(exerciseID: UUID)
+    /// The rest of an exercise was skipped, e.g. an optional one.
+    case exerciseSkipped(exerciseID: UUID)
     case sessionCompleted
     case paused
     case resumed

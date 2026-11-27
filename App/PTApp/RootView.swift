@@ -48,10 +48,8 @@ struct RootView: View {
                     SessionView(
                         viewModel: SessionViewModel(
                             routine: routine, sessionRepo: sessionRepo,
-                            // Exercises another workout covered today are left out.
-                            skipping: Set(OtherWorkoutStats.coveredExercises(
-                                on: .now, in: (try? sessionRepo.fetchAll()) ?? []
-                            ).keys)
+                            // Carries on from what's already done or covered today.
+                            skipping: DayProgress.skipping(on: .now, in: (try? sessionRepo.fetchAll()) ?? [])
                         ),
                         onComplete: { record in
                             finishedSession = record

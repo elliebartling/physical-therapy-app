@@ -10,6 +10,7 @@ public struct SettingsView: View {
     @AppStorage(RatingTiming.storageKey) private var ratingTiming = RatingTiming.atEnd
     @AppStorage(AppIconStyle.storageKey) private var iconStyle = AppIconStyle.rangeOfMotion
     @AppStorage(AppIconStyle.matchesAccentKey) private var iconMatchesAccent = true
+    @AppStorage(SessionPreferences.countdownHapticsKey) private var countdownHaptics = true
 
     private var accent: AccentChoice { AccentChoice(rawValue: accentRaw) ?? .signal }
 
@@ -57,6 +58,14 @@ public struct SettingsView: View {
                     Text("Ratings")
                 } footer: {
                     Text("Easy, about right, hard or painful — always optional. At the end, you can also note pain and anything for your PT.")
+                }
+
+                Section {
+                    Toggle("Countdown haptics", isOn: $countdownHaptics)
+                } header: {
+                    Text("Session")
+                } footer: {
+                    Text("A light tap on each of the last three seconds of a hold or rest, so you can keep your eyes closed.")
                 }
 
                 HealthSettingsSection(viewModel: viewModel)
