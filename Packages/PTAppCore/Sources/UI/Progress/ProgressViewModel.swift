@@ -365,7 +365,7 @@ public final class ProgressViewModel {
         minutes = inRange.compactMap(ProgressStats.minutes(of:)).reduce(0, +)
         otherWorkouts = allOtherWorkouts.filter { $0.start >= start }
         heatmap = ProgressStats.heatmap(in: sessions, weeks: min(count, Self.maxHeatmapWeeks), today: today,
-                                        otherWorkoutDays: OtherWorkoutStats.days(of: otherWorkouts, calendar: calendar),
+                                        otherWorkouts: OtherWorkoutStats.mainActivities(of: otherWorkouts, calendar: calendar),
                                         countedDays: counted, calendar: calendar)
         longestStreak = ProgressStats.longestStreak(in: sessions, from: start, through: today, calendar: calendar,
                                                     extraDays: counted)

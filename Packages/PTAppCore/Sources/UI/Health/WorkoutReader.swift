@@ -64,6 +64,40 @@ extension WorkoutActivity {
         .walking, .running, .hiking, .cycling, .swimming, .elliptical, .rowing, .stairClimbing, .socialDance,
     ].map { WorkoutActivity($0) }
 
+    /// An SF Symbol for the kind, for marking a day with it.
+    var symbolName: String {
+        switch HKWorkoutActivityType(rawValue: id) {
+        case .running: "figure.run"
+        case .walking: "figure.walk"
+        case .hiking: "figure.hiking"
+        case .cycling: "figure.outdoor.cycle"
+        case .swimming: "figure.pool.swim"
+        case .yoga: "figure.yoga"
+        case .pilates: "figure.pilates"
+        case .flexibility: "figure.flexibility"
+        case .mindAndBody: "figure.mind.and.body"
+        case .barre: "figure.barre"
+        case .taiChi: "figure.taichi"
+        case .coreTraining: "figure.core.training"
+        case .functionalStrengthTraining: "figure.strengthtraining.functional"
+        case .traditionalStrengthTraining: "figure.strengthtraining.traditional"
+        case .highIntensityIntervalTraining: "figure.highintensity.intervaltraining"
+        case .elliptical: "figure.elliptical"
+        case .rowing: "figure.rower"
+        case .stairClimbing: "figure.stair.stepper"
+        case .socialDance, .cardioDance: "figure.dance"
+        case .preparationAndRecovery: "figure.cooldown"
+        case .tennis: "figure.tennis"
+        case .soccer: "figure.soccer"
+        case .basketball: "figure.basketball"
+        case .golf: "figure.golf"
+        case .climbing: "figure.climbing"
+        case .crossTraining: "figure.cross.training"
+        case .pickleball: "figure.pickleball"
+        default: "figure.mixed.cardio"
+        }
+    }
+
     init(_ type: HKWorkoutActivityType) {
         let (name, tag): (String, String) = switch type {
         case .running: ("Running", "RUN")

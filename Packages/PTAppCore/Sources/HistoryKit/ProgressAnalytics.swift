@@ -43,9 +43,10 @@ public enum ProgressRange: String, CaseIterable, Identifiable, Sendable {
 public enum DayState: Equatable, Sendable {
     /// A completed session.
     case done
-    /// A session was started or logged but not every exercise was done.
+    /// A session was started or logged but not every exercise was done. Shown even when
+    /// another workout counted that day, since the workout has its own mark.
     case partial
-    /// No completed session, but another workout that counts toward the goal.
+    /// No session at all, but another workout that counts toward the goal.
     case otherWorkout
     case rest
     /// Later this week.
@@ -56,14 +57,18 @@ public enum DayState: Equatable, Sendable {
 public struct HeatmapWeek: Equatable, Sendable, Identifiable {
     public let weekStart: Date
     public let days: [DayState]
-    /// Days with a workout from outside Mend, in the same order as `days`.
-    public let others: [Bool]
+    /// The kind of the longest workout from outside Mend each day, if any, in the same
+    /// order as `days`.
+    public let workouts: [WorkoutActivity?]
     public var id: Date { weekStart }
 
-    public init(weekStart: Date, days: [DayState], others: [Bool] = []) {
+    /// Days with a workout from outside Mend, in the same order as `days`.
+    public var others: [Bool] { workouts.map { $0 != nil } }
+
+    public init(weekStart: Date, days: [DayState], workouts: [WorkoutActivity?] = []) {
         self.weekStart = weekStart
         self.days = days
-        self.others = others.isEmpty ? Array(repeating: false, count: days.count) : others
+        self.workouts = workouts.isEmpty ? Array(repeating: nil, count: days.count) : workouts
     }
 }
 
@@ -146,7 +151,7 @@ public extension ProgressStats {
         in sessions: [SessionRecord],
         weeks: Int,
         today: Date,
-        otherWorkoutDays: Set<Date> = [],
+        otherWorkouts: [Date: WorkoutActivity] = [:],
         countedDays: Set<Date> = [],
         calendar: Calendar = .current
     ) -> [HeatmapWeek] {
@@ -160,11 +165,11 @@ public extension ProgressStats {
             let days = dates.map { day -> DayState in
                 if day > todayStart { return .future }
                 if done.contains(day) { return .done }
-                if countedDays.contains(day) { return .otherWorkout }
                 if tried.contains(day) { return .partial }
+                if countedDays.contains(day) { return .otherWorkout }
                 return .rest
             }
-            return HeatmapWeek(weekStart: start, days: days, others: dates.map { otherWorkoutDays.contains($0) })
+            return HeatmapWeek(weekStart: start, days: days, workouts: dates.map { otherWorkouts[$0] })
         }
     }
 
