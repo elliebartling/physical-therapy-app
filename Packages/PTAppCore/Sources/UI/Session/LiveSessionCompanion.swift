@@ -10,7 +10,9 @@ private let logger = Logger(subsystem: "PTAppCore", category: "live-session")
 @MainActor
 public final class LiveSessionCompanion {
     private let keeper: WorkoutSessionKeeper
-    private var activity: Activity<SessionActivityAttributes>?
+    /// The running Live Activity's id. The activity itself is looked up where it's used,
+    /// so it never crosses from the main actor into ActivityKit's async calls.
+    private var activityID: String?
     private var lastState: SessionActivityAttributes.ContentState?
     /// The workout session is running, so the session carries on in the background.
     public private(set) var runsInBackground = false
@@ -29,10 +31,10 @@ public final class LiveSessionCompanion {
         }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         do {
-            activity = try Activity.request(
+            activityID = try Activity.request(
                 attributes: SessionActivityAttributes(routineName: routineName, accentHex: accentHex),
                 content: ActivityContent(state: state, staleDate: nil)
-            )
+            ).id
             lastState = state
         } catch {
             logger.error("Starting the Live Activity failed: \(String(describing: error), privacy: .public)")
@@ -41,9 +43,9 @@ public final class LiveSessionCompanion {
 
     /// Shows the session's current step. Repeats of the same state are dropped.
     public func update(_ state: SessionActivityAttributes.ContentState) {
-        guard let activity, state != lastState else { return }
+        guard let activityID, state != lastState else { return }
         lastState = state
-        Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }
+        Task { await Self.push(state, to: activityID) }
     }
 
     /// Ends the Live Activity and the workout session. `saveWorkout` keeps the workout in
@@ -52,13 +54,23 @@ public final class LiveSessionCompanion {
     @discardableResult
     public func finish(at end: Date, saveWorkout: Bool) async -> Bool {
         LiveSessionCommands.shared.handler = nil
-        if let activity {
-            self.activity = nil
-            await activity.end(nil, dismissalPolicy: .immediate)
+        if let activityID {
+            self.activityID = nil
+            await Self.endActivity(activityID)
         }
         guard runsInBackground else { return false }
         runsInBackground = false
         await keeper.end(at: end, save: saveWorkout)
         return true
+    }
+
+    private nonisolated static func push(_ state: SessionActivityAttributes.ContentState, to id: String) async {
+        guard let activity = Activity<SessionActivityAttributes>.activities.first(where: { $0.id == id }) else { return }
+        await activity.update(ActivityContent(state: state, staleDate: nil))
+    }
+
+    private nonisolated static func endActivity(_ id: String) async {
+        guard let activity = Activity<SessionActivityAttributes>.activities.first(where: { $0.id == id }) else { return }
+        await activity.end(nil, dismissalPolicy: .immediate)
     }
 }
