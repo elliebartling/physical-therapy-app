@@ -49,8 +49,11 @@ public final class RoutineRepository {
                                          to: newExercises.map { ExerciseSpec($0) })
             for (newIndex, oldIndex) in changes.matches {
                 newExercises[newIndex].lineageID = currentExercises[oldIndex].lineageID
+                // A new sheet doesn't say what's optional; keep what the person chose.
+                if currentExercises[oldIndex].isOptional { newExercises[newIndex].isOptional = true }
             }
             routine.phase = current.phase + 1
+            if routine.transitionSeconds == nil { routine.transitionSeconds = current.transitionSeconds }
             routine.previousVersionID = current.id
         }
         for old in try fetchAll() where old.isActive {

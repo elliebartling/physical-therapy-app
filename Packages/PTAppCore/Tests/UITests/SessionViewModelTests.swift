@@ -111,6 +111,16 @@ final class SessionViewModelTests: XCTestCase {
         XCTAssertFalse(SessionView.showsFigure(art: .unmatched, isResting: false, dynamicTypeSize: .large))
     }
 
+    /// While getting ready for the next exercise the title names that one, but `currentArt`
+    /// is still the exercise just finished — so no picture rather than the wrong picture.
+    func test_figureGoesWhileGettingReadyForTheNextExercise() {
+        let lib = ArtChoice.library(slug: "bird-dog")
+        XCTAssertFalse(SessionView.showsFigure(art: lib, isResting: false, isTransitioning: true,
+                                               dynamicTypeSize: .large))
+        XCTAssertTrue(SessionView.showsFigure(art: lib, isResting: false, isTransitioning: false,
+                                              dynamicTypeSize: .large))
+    }
+
 }
 
 final class TimerReadingTests: XCTestCase {

@@ -1,4 +1,5 @@
 import SwiftUI
+import SessionKit
 import HistoryKit
 import MediaKit
 
@@ -11,6 +12,9 @@ public struct SettingsView: View {
     @AppStorage(RatingTiming.storageKey) private var ratingTiming = RatingTiming.atEnd
     @AppStorage(AppIconStyle.storageKey) private var iconStyle = AppIconStyle.rangeOfMotion
     @AppStorage(AppIconStyle.matchesAccentKey) private var iconMatchesAccent = true
+    @AppStorage(SessionPreferences.countdownHapticsKey) private var countdownHaptics = true
+    @AppStorage(SessionPreferences.transitionSecondsKey) private var transitionSeconds = SessionPreferences.defaultTransitionSeconds
+    @AppStorage(SessionPreferences.announceNextKey) private var announceNext = true
 
     private var accent: AccentChoice { AccentChoice(rawValue: accentRaw) ?? .signal }
 
@@ -58,6 +62,20 @@ public struct SettingsView: View {
                     Text("Ratings")
                 } footer: {
                     Text("Easy, about right, hard or painful — always optional. At the end, you can also note pain and anything for your PT.")
+                }
+
+                Section {
+                    Picker("Between exercises", selection: $transitionSeconds) {
+                        ForEach(SessionTransition.choices, id: \.self) { seconds in
+                            Text(SessionTransition.title(for: seconds)).tag(seconds)
+                        }
+                    }
+                    Toggle("Say what's next", isOn: $announceNext)
+                    Toggle("Countdown haptics", isOn: $countdownHaptics)
+                } header: {
+                    Text("Session")
+                } footer: {
+                    Text("A pause to get into position, with what's next on screen and read aloud. A routine can set its own pause when you edit it. Countdown haptics tap on each of the last three seconds of a hold, rest or pause.")
                 }
 
                 HealthSettingsSection(viewModel: viewModel)

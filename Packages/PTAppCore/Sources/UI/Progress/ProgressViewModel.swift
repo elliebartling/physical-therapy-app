@@ -321,9 +321,12 @@ public final class ProgressViewModel {
                 stats: stats[exercise.lineageID] ?? ExerciseStats(),
                 lastRating: history.first(where: { $0.rating != nil })?.rating,
                 recent: history.prefix(Self.recentCount).reversed().map(\.mark),
-                trend: ProgressStats.trend(
-                    newestFirst: history.map { RatedEntry(date: $0.date, isDone: $0.isDone, rating: $0.rating) },
-                    today: today, calendar: calendar
+                trend: Self.trend(
+                    ProgressStats.trend(
+                        newestFirst: history.map { RatedEntry(date: $0.date, isDone: $0.isDone, rating: $0.rating) },
+                        today: today, calendar: calendar
+                    ),
+                    isOptional: exercise.isOptional
                 ),
                 art: exercise.art,
                 sheetHowTo: exercise.sheetHowTo
@@ -477,6 +480,12 @@ public final class ProgressViewModel {
         case let .easier(count, of):
             return ("Easier lately", "Rated easy \(count) of the last \(of) times. Worth asking whether to progress it.")
         }
+    }
+
+    /// Skipping an optional exercise is expected, so it isn't worth raising.
+    static func trend(_ trend: ExerciseTrend?, isOptional: Bool) -> ExerciseTrend? {
+        if isOptional, case .oftenSkipped? = trend { return nil }
+        return trend
     }
 
     /// The short tag shown beside an exercise in the list.

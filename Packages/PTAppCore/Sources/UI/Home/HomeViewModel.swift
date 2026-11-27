@@ -17,6 +17,10 @@ public final class HomeViewModel {
         public let art: ArtChoice
         /// The other workout that stood in for it today, e.g. "Yoga".
         public var coveredBy: String? = nil
+        /// Done earlier today in a session that didn't finish; Start carries on after it.
+        public var isDone: Bool = false
+        /// An extra: skipping it doesn't leave the day partial.
+        public var isOptional: Bool = false
     }
 
     /// A workout from Apple Health that covers some of today's exercises, waiting for a yes.
@@ -65,7 +69,10 @@ public final class HomeViewModel {
     public var isDoneToday: Bool { week.isTodayCompleted }
 
     /// Exercises still to do today: not done, and not covered by another workout.
-    public var remainingCount: Int { rows.filter { $0.coveredBy == nil }.count }
+    public var remainingCount: Int { rows.filter { $0.coveredBy == nil && !$0.isDone }.count }
+
+    /// Some of today's exercises are done but the day isn't complete: Start carries on.
+    public var canContinue: Bool { !isDoneToday && rows.contains { $0.isDone || $0.coveredBy != nil } }
 
     /// The big statement at the top of Today. Kind, never guilt-tripping.
     public var headline: String {
@@ -123,6 +130,8 @@ public final class HomeViewModel {
         }
 
         let covered = OtherWorkoutStats.coveredExercises(on: today, in: sessions, calendar: calendar)
+        // What Start will leave out: today's done and covered exercises, unless the day's complete.
+        let skipping = DayProgress.skipping(on: today, in: sessions, calendar: calendar)
         rows = exercises.enumerated().map { index, exercise in
             ExerciseRow(
                 id: exercise.id,
@@ -130,10 +139,12 @@ public final class HomeViewModel {
                 name: exercise.name,
                 prescription: Prescription.text(target: exercise.target, side: exercise.side),
                 art: exercise.art,
-                coveredBy: covered[exercise.id]
+                coveredBy: covered[exercise.id],
+                isDone: covered[exercise.id] == nil && skipping.contains(exercise.id),
+                isOptional: exercise.isOptional
             )
         }
-        estimatedMinutes = SessionEstimate.minutes(for: exercises.filter { covered[$0.id] == nil })
+        estimatedMinutes = SessionEstimate.minutes(for: exercises.filter { !skipping.contains($0.id) })
         streak = StreakCalculator.currentStreak(
             in: sessions, today: today, calendar: calendar,
             extraDays: counting ? OtherWorkoutStats.countingDays(of: recentWorkouts, calendar: calendar) : []
@@ -189,8 +200,7 @@ public final class HomeViewModel {
     /// The session is complete when, with what's already done today, nothing is left.
     private func record(_ offer: CoverageOffer, routine: Routine, sessions: [SessionRecord]) {
         let done = OtherWorkoutStats.doneExercises(on: today, in: sessions, calendar: calendar)
-        let finished = Set(routine.exercises.map(\.id))
-            .isSubset(of: done.union(offer.exercises.map(\.id)))
+        let finished = DayProgress.coversRequired(routine.exercises, done: done.union(offer.exercises.map(\.id)))
         let records = offer.exercises.map { exercise in
             let record = ExerciseRecord(exerciseID: exercise.id, status: .completed,
                                         startedAt: offer.end, completedAt: offer.end)

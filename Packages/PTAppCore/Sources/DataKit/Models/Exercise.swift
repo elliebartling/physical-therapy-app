@@ -21,6 +21,9 @@ public final class Exercise {
     /// Optional so stores from before this field migrate; read it through `sheetHowTo`.
     /// Never mirrored into `notes`, which the session screen shows mid-exercise.
     public var sheetHowToData: Data?
+    /// Extra, not required: skipping it doesn't leave the day partial. Optional so older
+    /// stores migrate; read it through `isOptional`.
+    public var optionalStorage: Bool? = nil
 
     public init(
         id: UUID = UUID(),
@@ -33,7 +36,8 @@ public final class Exercise {
         media: [Asset] = [],
         lineageID: UUID? = nil,
         art: ArtChoice = .unmatched,
-        sheetHowTo: [HowToSection] = []
+        sheetHowTo: [HowToSection] = [],
+        isOptional: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -46,6 +50,13 @@ public final class Exercise {
         self.lineageStorage = lineageID
         self.artRaw = art.rawValue
         self.sheetHowToData = sheetHowTo.isEmpty ? nil : (try? JSONEncoder().encode(sheetHowTo))
+        self.optionalStorage = isOptional ? true : nil
+    }
+
+    /// An extra: skipping it doesn't leave the day partial or break the streak.
+    public var isOptional: Bool {
+        get { optionalStorage ?? false }
+        set { optionalStorage = newValue ? true : nil }
     }
 
     /// The same exercise across phases: history and charts group by this.

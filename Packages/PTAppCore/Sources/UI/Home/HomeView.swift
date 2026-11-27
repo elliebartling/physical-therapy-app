@@ -343,13 +343,21 @@ private struct ExerciseRowView: View {
             ExerciseFigure(art: row.art)
                 .frame(width: 44, height: 44)
                 .padding(.trailing, 12)
-            Text(row.name)
-                .font(AppFont.display(16, weight: .medium))
-                .strikethrough(row.coveredBy != nil)
-                .foregroundStyle(row.coveredBy == nil ? AppColor.ink : AppColor.inkSecondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.name)
+                    .font(AppFont.display(16, weight: .medium))
+                    .strikethrough(isCrossedOff)
+                    .foregroundStyle(isCrossedOff ? AppColor.inkSecondary : AppColor.ink)
+                if row.isOptional {
+                    Text("OPTIONAL")
+                        .font(AppFont.mono(10))
+                        .tracking(0.5)
+                        .foregroundStyle(AppColor.inkSecondary)
+                }
+            }
             Spacer(minLength: 12)
-            if let coveredBy = row.coveredBy {
-                Text(coveredBy.uppercased())
+            if let tag = row.coveredBy ?? (row.isDone ? "Done" : nil) {
+                Text(tag.uppercased())
                     .font(AppFont.mono(10, weight: .medium))
                     .tracking(0.5)
                     .padding(.horizontal, 5)
@@ -363,8 +371,22 @@ private struct ExerciseRowView: View {
         .padding(.vertical, 11)
         .overlay(alignment: .top) { HairlineDivider() }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(row.coveredBy.map { "\(row.name), covered by \($0.lowercased())" }
-                            ?? "\(row.name), \(row.prescription)")
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var isCrossedOff: Bool { row.coveredBy != nil || row.isDone }
+
+    private var accessibilityText: String {
+        var text = row.name
+        if let coveredBy = row.coveredBy {
+            text += ", covered by \(coveredBy.lowercased())"
+        } else if row.isDone {
+            text += ", done"
+        } else {
+            text += ", \(row.prescription)"
+        }
+        if row.isOptional { text += ", optional" }
+        return text
     }
 }
 

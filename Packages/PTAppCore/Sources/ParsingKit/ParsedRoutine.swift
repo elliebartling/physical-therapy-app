@@ -14,8 +14,12 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
         public var art: ArtChoice
         /// The handout's own instruction prose; never merged into `notes`.
         public var sheetHowTo: [HowToSection]
+        /// An extra the person marked; never read from a sheet.
+        public var isOptional: Bool
 
-        public init(id: UUID = UUID(), name: String, reps: Int?, sets: Int, durationSec: Int?, restSec: Int, side: String, notes: String, art: ArtChoice = .unmatched, sheetHowTo: [HowToSection] = []) {
+        public init(id: UUID = UUID(), name: String, reps: Int?, sets: Int, durationSec: Int?, restSec: Int, side: String,
+                    notes: String, art: ArtChoice = .unmatched, sheetHowTo: [HowToSection] = [],
+                    isOptional: Bool = false) {
             self.id = id
             self.name = name
             self.reps = reps
@@ -26,10 +30,11 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
             self.notes = notes
             self.art = art
             self.sheetHowTo = sheetHowTo
+            self.isOptional = isOptional
         }
 
         private enum CodingKeys: String, CodingKey {
-            case id, name, reps, sets, durationSec, restSec, side, notes, art, sheetHowTo
+            case id, name, reps, sets, durationSec, restSec, side, notes, art, sheetHowTo, isOptional
         }
 
         public init(from decoder: Decoder) throws {
@@ -44,15 +49,19 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
             self.notes = try c.decode(String.self, forKey: .notes)
             self.art = (try? c.decode(ArtChoice.self, forKey: .art)) ?? .unmatched
             self.sheetHowTo = (try? c.decode([HowToSection].self, forKey: .sheetHowTo)) ?? []
+            self.isOptional = (try? c.decodeIfPresent(Bool.self, forKey: .isOptional)) ?? false
         }
     }
 
     public var name: String
     public var exercises: [ParsedExercise]
+    /// The pause between exercises; nil follows the app's setting. See `Routine.transitionSeconds`.
+    public var transitionSeconds: Int?
 
-    public init(name: String, exercises: [ParsedExercise]) {
+    public init(name: String, exercises: [ParsedExercise], transitionSeconds: Int? = nil) {
         self.name = name
         self.exercises = exercises
+        self.transitionSeconds = transitionSeconds
     }
 
     public func toRoutine() -> Routine {
@@ -72,9 +81,12 @@ public struct ParsedRoutine: Codable, Sendable, Equatable {
                 notes: p.notes,
                 order: idx,
                 art: p.art,
-                sheetHowTo: p.sheetHowTo
+                sheetHowTo: p.sheetHowTo,
+                isOptional: p.isOptional
             )
         }
-        return Routine(name: name, exercises: mapped)
+        let routine = Routine(name: name, exercises: mapped)
+        routine.transitionSeconds = transitionSeconds
+        return routine
     }
 }

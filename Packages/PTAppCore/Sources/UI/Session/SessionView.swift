@@ -52,6 +52,9 @@ public struct SessionView: View {
                 .padding(.horizontal, AppSpacing.screenPadding)
                 .padding(.bottom, AppSpacing.s(1))
             }
+            .onChange(of: reading.remaining) { previous, remaining in
+                viewModel.timerTicked(from: previous, to: remaining)
+            }
         }
         .foregroundStyle(AppColor.ink)
         .opacity(viewModel.isComplete ? 0 : 1)
@@ -71,11 +74,18 @@ public struct SessionView: View {
             guard complete else { return }
             viewModel.endedEarly ? onEnd() : onComplete(viewModel.record)
         }
-        .confirmationDialog("End this session?", isPresented: $confirmingEnd, titleVisibility: .visible) {
-            Button("End session", role: .destructive) { viewModel.endEarly() }
+        .confirmationDialog(viewModel.canFinishNow ? "Finish this session?" : "End this session?",
+                            isPresented: $confirmingEnd, titleVisibility: .visible) {
+            if viewModel.canFinishNow {
+                Button("Finish session") { viewModel.finishNow() }
+            } else {
+                Button("End session", role: .destructive) { viewModel.endEarly() }
+            }
             Button("Keep going", role: .cancel) {}
         } message: {
-            Text("What you've done so far is saved.")
+            Text(viewModel.canFinishNow
+                 ? "Everything required is done; the rest are optional. It counts as a full day."
+                 : "What you've done so far is saved. You can carry on later today from where you stopped.")
         }
         .statusBarHidden()
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
@@ -112,26 +122,51 @@ public struct SessionView: View {
                     .frame(maxWidth: 96, maxHeight: 96, alignment: .leading)
                     .layoutPriority(-1) // yields to the title within this block
             }
-            Text(viewModel.isResting ? "Rest" : viewModel.currentExerciseName)
-                .font(AppFont.display(56, weight: .bold))
-                .tracking(-2.6)
-                .lineLimit(2)
-                .minimumScaleFactor(0.6)
+            if let upNext = viewModel.upNext, viewModel.isTransitioning {
+                SectionLabel("Up next")
+                    .padding(.bottom, -6)
+                Text(upNext.name)
+                    .font(AppFont.display(56, weight: .bold))
+                    .tracking(-2.6)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+            } else {
+                Text(viewModel.isResting ? "Rest" : viewModel.currentExerciseName)
+                    .font(AppFont.display(56, weight: .bold))
+                    .tracking(-2.6)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+            }
             Text(metaLine)
                 .font(AppFont.mono(12, weight: .medium))
                 .tracking(0.7)
                 .foregroundStyle(AppColor.inkSecondary)
-            if !viewModel.isResting, !viewModel.currentNotes.isEmpty {
+            if !viewModel.isResting, !viewModel.isTransitioning, !viewModel.currentNotes.isEmpty {
                 Text(viewModel.currentNotes)
                     .font(AppFont.body(15))
                     .foregroundStyle(AppColor.inkSecondary)
                     .lineLimit(3)
+            }
+            if viewModel.currentIsOptional, !viewModel.isResting, !viewModel.isTransitioning {
+                Button {
+                    Task { await viewModel.skipCurrentExercise() }
+                } label: {
+                    Label("Skip this one", systemImage: "forward.end")
+                        .font(AppFont.display(15, weight: .semibold))
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .contentShape(Capsule())
+                        .glassEffect(.regular.interactive(), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("It's optional, so the day still counts")
             }
         }
     }
 
     private var showsFigure: Bool {
         Self.showsFigure(art: viewModel.currentArt, isResting: viewModel.isResting,
+                         isTransitioning: viewModel.isTransitioning,
                          dynamicTypeSize: dynamicTypeSize)
     }
 
@@ -139,12 +174,21 @@ public struct SessionView: View {
     /// (no reserved blank for `.none`/`.unmatched`), not during Rest, and not at accessibility
     /// sizes. `isAccessibilitySize` is deliberately coarse: it also drops the figure on
     /// large phones with room to spare, which is cheaper and safer than measuring space.
-    static func showsFigure(art: ArtChoice, isResting: Bool, dynamicTypeSize: DynamicTypeSize) -> Bool {
+    /// It also goes while getting ready for the next exercise: the title then names a
+    /// different exercise, and `currentArt` is still the one just finished.
+    static func showsFigure(art: ArtChoice, isResting: Bool, isTransitioning: Bool = false,
+                            dynamicTypeSize: DynamicTypeSize) -> Bool {
         guard case .library = art else { return false }
-        return !isResting && !dynamicTypeSize.isAccessibilitySize
+        return !isResting && !isTransitioning && !dynamicTypeSize.isAccessibilitySize
     }
 
     private var metaLine: String {
+        if let upNext = viewModel.upNext, viewModel.isTransitioning {
+            var parts = [upNext.prescription.uppercased()]
+            if upNext.isOptional { parts.append("OPTIONAL") }
+            if viewModel.isPaused { parts.append("PAUSED") }
+            return parts.joined(separator: " — ")
+        }
         if viewModel.isResting {
             return "NEXT — SET \(viewModel.currentSet + 1)/\(viewModel.totalSets)"
         }
@@ -155,6 +199,7 @@ public struct SessionView: View {
         case .both, .alternating: break
         }
         if case .hold = viewModel.display { parts.append("HOLD") }
+        if viewModel.currentIsOptional { parts.append("OPTIONAL") }
         if viewModel.isPaused { parts.append("PAUSED") }
         return parts.joined(separator: " — ")
     }
@@ -176,7 +221,14 @@ public struct SessionView: View {
 
     @ViewBuilder
     private var primaryButton: some View {
-        if case .reps = viewModel.display, !viewModel.isPaused {
+        if case .transition(nil) = viewModel.display, !viewModel.isPaused {
+            Button {
+                Task { await viewModel.startNext() }
+            } label: {
+                primaryLabel("Start", systemImage: "play.fill")
+            }
+            .buttonStyle(InkGlassButtonStyle())
+        } else if case .reps = viewModel.display, !viewModel.isPaused {
             Button {
                 Task { await viewModel.completeCurrentSet() }
             } label: {
@@ -226,7 +278,12 @@ struct TimerReading: Equatable {
             total = count
             remaining = count
             fraction = 0
-        case .starting:
+        case .transition(let seconds?):
+            let left = max(0, Double(seconds) - now.timeIntervalSince(startedAt))
+            total = seconds
+            remaining = Int(left.rounded(.up))
+            fraction = seconds > 0 ? left / Double(seconds) : 0
+        case .transition(nil), .starting:
             total = 0
             remaining = 0
             fraction = 0
@@ -245,8 +302,10 @@ private struct TimerField: View {
         Rectangle()
             .fill(color.fieldTone(for: colorScheme))
             .containerRelativeFrame(.vertical) { length, _ in length * 0.55 * CGFloat(fraction) }
-            .frame(maxWidth: .infinity)
-            .ignoresSafeArea(edges: .bottom)
+            // Fill the screen's full width and height, then sit at the very bottom, past the
+            // home indicator, so the field runs to the edge.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .ignoresSafeArea()
             .animation(reduceMotion ? nil : .linear(duration: 0.25), value: fraction)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
@@ -274,7 +333,7 @@ private struct BigReading: View {
             .font(AppFont.mono(12, weight: .medium))
             .tracking(0.7)
         }
-        .opacity(reading.display == .starting ? 0 : 1)
+        .opacity(reading.display == .starting || reading.display == .transition(seconds: nil) ? 0 : 1)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
@@ -287,6 +346,7 @@ private struct BigReading: View {
     private var suffix: String? {
         switch reading.display {
         case .hold, .rest: return "OF \(reading.total)"
+        case .transition: return "GET READY"
         case .reps, .starting: return nil
         }
     }
@@ -295,6 +355,8 @@ private struct BigReading: View {
         switch reading.display {
         case .hold: return "\(reading.remaining) of \(reading.total) seconds left"
         case .rest: return "Rest, \(reading.remaining) seconds left"
+        case .transition(let seconds?): return "Next exercise in \(min(reading.remaining, seconds)) seconds"
+        case .transition(nil): return ""
         case .reps(let count): return "\(count) reps"
         case .starting: return ""
         }
